@@ -1,0 +1,43 @@
+.consult-panel h3 {
+  font-size: 16px;
+}
+
+.consult-panel--ai {
+  background: var(--amber-pale);
+  border: 1.5px dashed var(--amber);
+}
+
+.med-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 80px 60px 24px;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+.med-row input {
+  padding: 7px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+.med-row__source {
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  padding: 4px 0;
+  border-radius: var(--radius-sm);
+}
+.med-row__source--ai_suggested {
+  background: var(--amber-pale);
+  color: var(--amber);
+}
+.med-row__source--doctor_added {
+  background: var(--teal-pale);
+  color: var(--teal-dark);
+}
+.med-row__remove {
+  background: transparent;
+  border: none;
+  color: var(--rose);
+  font-size: 14px;
+}
