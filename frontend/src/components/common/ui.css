@@ -1,0 +1,117 @@
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: 20px;
+}
+
+.btn {
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  border: 1px solid transparent;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.btn--sm {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+.btn--md {
+  padding: 9px 18px;
+  font-size: 14px;
+}
+.btn--lg {
+  padding: 12px 24px;
+  font-size: 15px;
+}
+
+.btn--primary {
+  background: var(--teal);
+  color: white;
+}
+.btn--primary:hover {
+  background: var(--teal-dark);
+}
+.btn--primary:disabled {
+  background: var(--border-strong);
+  color: #8a8378;
+  cursor: not-allowed;
+}
+
+.btn--secondary {
+  background: var(--surface);
+  color: var(--ink);
+  border-color: var(--border-strong);
+}
+.btn--secondary:hover {
+  border-color: var(--teal);
+  color: var(--teal-dark);
+}
+
+.btn--danger {
+  background: var(--surface);
+  color: var(--rose);
+  border-color: var(--rose);
+}
+.btn--danger:hover {
+  background: var(--rose-pale);
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--ink-soft);
+  border-color: transparent;
+}
+.btn--ghost:hover {
+  background: var(--paper);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.field__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.field__hint {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.field__error {
+  font-size: 12px;
+  color: var(--rose);
+}
+
+.field input,
+.field select,
+.field textarea {
+  padding: 9px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+}
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  border-color: var(--teal);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--ink-soft);
+}
+.empty-state h3 {
+  color: var(--ink);
+  margin-bottom: 8px;
+}

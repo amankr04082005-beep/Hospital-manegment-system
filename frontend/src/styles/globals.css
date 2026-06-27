@@ -1,0 +1,127 @@
+/*
+  DESIGN PLAN — MediFlow Hospital System
+  -----------------------------------------------------------------
+  Subject: a real hospital ops tool used by receptionists, doctors,
+  pharmacists and patients during actual care moments — not a marketing
+  site. The job of this UI is legibility, speed, and trust under time
+  pressure, not delight-for-its-own-sake.
+
+  Color (named, 6 values):
+    --ink        #16241F   deep pine-black, primary text
+    --paper      #F6F4EE   warm clinical paper, page background
+    --surface    #FFFFFF   card / panel surface
+    --teal       #0E6E5C   primary action, the "clinical green" of scrubs/signage
+    --amber      #B8762B   AI-suggested / pending-review marker (warm caution, not red)
+    --rose       #9C3B3B   destructive / critical alert (allergy, contraindication)
+
+  Type:
+    Display/headers: "Source Serif 4" — gives the system a chart/ledger
+      authority (like a patient file), used with restraint for titles only.
+    Body/UI: "Inter" — clean, highly legible at small sizes for dense data.
+    Data/codes: "IBM Plex Mono" — appointment numbers, prescription IDs,
+      registration numbers: anything that should read as a precise record.
+
+  Layout concept:
+    Left rail navigation (role-aware) + content area with a persistent
+    top status strip. Cards use a hairline border, not heavy shadow —
+    a real chart folder, not a floating app tile.
+
+  Signature element:
+    The "AI Suggested — Pending Doctor Approval" badge: an amber dashed-
+    border tag that visually behaves like a sticky note clipped to a
+    chart, distinct from the doctor's solid teal "Approved" stamp.
+    This single visual contrast *is* the compliance rule made visible —
+    the eye can immediately tell draft from approved across the whole app.
+  -----------------------------------------------------------------
+*/
+
+:root {
+  --ink: #16241f;
+  --ink-soft: #44524b;
+  --paper: #f6f4ee;
+  --surface: #ffffff;
+  --teal: #0e6e5c;
+  --teal-dark: #0a5345;
+  --teal-pale: #e3efea;
+  --amber: #b8762b;
+  --amber-pale: #f7ecdb;
+  --rose: #9c3b3b;
+  --rose-pale: #f6e7e7;
+  --border: #e1ddd2;
+  --border-strong: #c9c2b2;
+
+  --font-display: 'Source Serif 4', Georgia, serif;
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --shadow-card: 0 1px 2px rgba(22, 36, 31, 0.06), 0 1px 0 rgba(22, 36, 31, 0.04);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+button {
+  font-family: var(--font-body);
+  cursor: pointer;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
+
+input,
+select,
+textarea {
+  font-family: var(--font-body);
+  font-size: 14px;
+}
+
+a {
+  color: var(--teal-dark);
+  text-decoration: none;
+}
+
+code,
+.mono {
+  font-family: var(--font-mono);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
