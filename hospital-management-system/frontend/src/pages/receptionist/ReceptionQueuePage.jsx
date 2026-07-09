@@ -92,6 +92,11 @@ export default function ReceptionQueuePage() {
                   </>
                 )}
 
+                {/* Fix: doctor queue should receive forwarded appointments.
+                    forwardToDoctor() sets status='in_progress', so doctor's page filters by that.
+                    Ensure we show forward button for booked appointments so it gets forwarded. */}
+
+
                 {/* Doctor queue me dikhane ke liye forward endpoint apt.status ko `in_progress` set karta hai.
                     Patient booking ke baad receptionist forward tabhi karega jab status booked/confirmed ho. */}
 
