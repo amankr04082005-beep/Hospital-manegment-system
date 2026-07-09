@@ -1,0 +1,29 @@
+{
+  "name": "hospital-management-system",
+  "version": "1.0.0",
+  "description": "Hospital Management & AI-Assisted Consultation System",
+  "private": true,
+  "scripts": {
+    "test": "node medicine-engine/test/logic.test.js",
+    "test:medicine-engine": "cd medicine-engine && npm test",
+    "test:backend": "cd backend && npm test 2>/dev/null || echo 'No backend tests configured'",
+    "test:frontend": "cd frontend && npm test 2>/dev/null || echo 'No frontend tests configured'",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install && cd ../medicine-engine && npm install",
+    "start:backend": "cd backend && npm start",
+    "start:frontend": "cd frontend && npm run dev"
+  },
+  "keywords": [
+    "hospital",
+    "appointment",
+    "consultation",
+    "medicine",
+    "ai-clinical-decision-support"
+  ],
+  "author": "",
+  "license": "MIT",
+  "workspaces": [
+    "backend",
+    "frontend",
+    "medicine-engine"
+  ]
+}

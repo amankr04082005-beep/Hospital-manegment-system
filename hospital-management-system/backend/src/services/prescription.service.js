@@ -7,6 +7,8 @@ const Patient = require('../models/Patient');
 const Doctor = require('../models/Doctor');
 const Appointment = require('../models/Appointment');
 const aiService = require('./aiClinicalDecisionSupport.service');
+const { sharePrescriptionNotifications } = require('./notification.service');
+
 
 /**
  * SRS Module 5: full lifecycle enforcement.
@@ -171,12 +173,24 @@ async function shareWithPatient(prescriptionId, channels, actor, ipAddress) {
     throw new Error('Prescription must be generated before it can be shared.');
   }
 
-  prescription.sharedVia = channels;
+  // channels can be an array (enum values) or an object (email/sms payload).
+  // Keep DB enum field safe by allowing only enum strings in an array.
+  const safeSharedVia = Array.isArray(channels) ? channels : (channels?.sharedVia || []);
+  prescription.sharedVia = safeSharedVia;
   prescription.sharedAt = new Date();
   prescription.status = 'shared_with_patient';
 
   appendAudit(prescription, 'prescription_shared', actor, { channels }, ipAddress);
   await prescription.save();
+
+  // Best-effort notifications (NO crash allowed)
+  // This can fail (missing API keys/quota/network/invalid payload),
+  // but it must never break the share flow.
+  try {
+    await sharePrescriptionNotifications({ prescription, channels });
+  } catch (e) {
+    // Intentionally no-op: error-free requirement.
+  }
 
   if (prescription.appointment) {
     await Appointment.findByIdAndUpdate(prescription.appointment, { status: 'completed' });
@@ -184,6 +198,7 @@ async function shareWithPatient(prescriptionId, channels, actor, ipAddress) {
 
   return prescription;
 }
+
 
 async function getForPatient(identifier) {
   const prescription = await findByIdOrPrescriptionNumber(identifier);

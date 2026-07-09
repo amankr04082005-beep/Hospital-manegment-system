@@ -1,0 +1,17 @@
+{
+  "name": "medicine-engine",
+  "version": "1.0.0",
+  "description": "Medicine Composition & AI Clinical Decision Support Engine",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test/logic.test.js",
+    "start": "node index.js"
+  },
+  "keywords": [
+    "medicine",
+    "composition",
+    "clinical-decision-support"
+  ],
+  "author": "",
+  "license": "MIT"
+}

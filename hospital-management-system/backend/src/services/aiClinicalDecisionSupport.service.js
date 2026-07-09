@@ -18,6 +18,15 @@ const Medicine = require('../models/Medicine');
 
 const AI_LABEL = 'AI Suggested - Pending Doctor Approval'; // Rule 1
 
+// --- Optional real AI provider (Gemini) ---
+// Default is MOCK to avoid network issues / quota / missing API keys.
+// To enable Gemini (free tier), set:
+//   AI_ENGINE=gemini
+//   GEMINI_API_KEY=...
+// If Gemini fails for ANY reason, we fallback to MOCK so there are no runtime errors.
+const AI_ENGINE = process.env.AI_ENGINE || 'mock';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || null;
+
 // Simple keyword -> clinical suggestion knowledge base.
 // Each entry mimics what an LLM might return for that symptom pattern.
 const SYMPTOM_KNOWLEDGE_BASE = [
@@ -132,55 +141,148 @@ const DEFAULT_SUGGESTION = {
  * network failure — this mirrors a real implementation's shape exactly.
  */
 async function callLanguageModel({ symptoms = '' }) {
-  // Simulate a short "thinking" delay so the UI loading state feels real.
-  await new Promise((resolve) => setTimeout(resolve, 400));
+  // Always safe: never throw. If Gemini is enabled and fails, fallback to MOCK.
+  const runMock = async () => {
+    // Simulate a short "thinking" delay so the UI loading state feels real.
+    await new Promise((resolve) => setTimeout(resolve, 400));
 
-  const lowerSymptoms = symptoms.toLowerCase();
-  const matches = SYMPTOM_KNOWLEDGE_BASE.filter((entry) =>
-    entry.keywords.some((kw) => lowerSymptoms.includes(kw))
-  );
+    const lowerSymptoms = symptoms.toLowerCase();
+    const matches = SYMPTOM_KNOWLEDGE_BASE.filter((entry) =>
+      entry.keywords.some((kw) => lowerSymptoms.includes(kw))
+    );
 
-  if (matches.length === 0) {
-    return DEFAULT_SUGGESTION;
+    if (matches.length === 0) {
+      return DEFAULT_SUGGESTION;
+    }
+
+    // Merge all matching entries (a patient may report multiple symptom groups).
+    const merged = matches.reduce(
+      (acc, entry) => ({
+        probableDiagnoses: [...acc.probableDiagnoses, ...entry.probableDiagnoses],
+        medicineSuggestions: [...acc.medicineSuggestions, ...entry.medicineSuggestions],
+        clinicalAdvice: {
+          dietRecommendations: [
+            ...acc.clinicalAdvice.dietRecommendations,
+            ...entry.clinicalAdvice.dietRecommendations,
+          ],
+          lifestyleRecommendations: [
+            ...acc.clinicalAdvice.lifestyleRecommendations,
+            ...entry.clinicalAdvice.lifestyleRecommendations,
+          ],
+          followUpSuggestions: [
+            ...acc.clinicalAdvice.followUpSuggestions,
+            ...entry.clinicalAdvice.followUpSuggestions,
+          ],
+          suggestedLabTests: [
+            ...acc.clinicalAdvice.suggestedLabTests,
+            ...entry.clinicalAdvice.suggestedLabTests,
+          ],
+        },
+      }),
+      {
+        probableDiagnoses: [],
+        medicineSuggestions: [],
+        clinicalAdvice: {
+          dietRecommendations: [],
+          lifestyleRecommendations: [],
+          followUpSuggestions: [],
+          suggestedLabTests: [],
+        },
+      }
+    );
+
+    // De-duplicate simple string lists.
+    merged.clinicalAdvice.dietRecommendations = [
+      ...new Set(merged.clinicalAdvice.dietRecommendations),
+    ];
+    merged.clinicalAdvice.lifestyleRecommendations = [
+      ...new Set(merged.clinicalAdvice.lifestyleRecommendations),
+    ];
+    merged.clinicalAdvice.followUpSuggestions = [
+      ...new Set(merged.clinicalAdvice.followUpSuggestions),
+    ];
+    merged.clinicalAdvice.suggestedLabTests = [
+      ...new Set(merged.clinicalAdvice.suggestedLabTests),
+    ];
+
+    return merged;
+  };
+
+  if (AI_ENGINE !== 'gemini') {
+    return runMock();
   }
 
-  // Merge all matching entries (a patient may report multiple symptom groups).
-  const merged = matches.reduce(
-    (acc, entry) => ({
-      probableDiagnoses: [...acc.probableDiagnoses, ...entry.probableDiagnoses],
-      medicineSuggestions: [...acc.medicineSuggestions, ...entry.medicineSuggestions],
-      clinicalAdvice: {
-        dietRecommendations: [...acc.clinicalAdvice.dietRecommendations, ...entry.clinicalAdvice.dietRecommendations],
-        lifestyleRecommendations: [
-          ...acc.clinicalAdvice.lifestyleRecommendations,
-          ...entry.clinicalAdvice.lifestyleRecommendations,
-        ],
-        followUpSuggestions: [
-          ...acc.clinicalAdvice.followUpSuggestions,
-          ...entry.clinicalAdvice.followUpSuggestions,
-        ],
-        suggestedLabTests: [...acc.clinicalAdvice.suggestedLabTests, ...entry.clinicalAdvice.suggestedLabTests],
+  if (!GEMINI_API_KEY) {
+    // Gemini enabled but key missing => mock.
+    return runMock();
+  }
+
+  try {
+    const axios = require('axios');
+
+    // Gemini free-tier via API key.
+    // Using REST endpoint directly to avoid adding SDK dependencies.
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+    const prompt = `You are a clinical decision support assistant for doctors.
+Return ONLY valid JSON matching this schema:
+{
+  "probableDiagnoses": [{"diagnosis": string, "confidence": number}],
+  "medicineSuggestions": [{"brandName": string, "genericName": string, "composition": string, "dosage": string, "frequency": string, "durationDays": number, "instructions": string}],
+  "clinicalAdvice": {
+     "dietRecommendations": [string],
+     "lifestyleRecommendations": [string],
+     "followUpSuggestions": [string],
+     "suggestedLabTests": [string]
+  }
+}
+
+Symptoms: ${symptoms}
+
+Important: Provide safe, general suggestions for doctor review. Do not include anything non-JSON.`;
+
+    const response = await axios.post(
+      url,
+      {
+        contents: [{
+          role: 'user',
+          parts: [{ text: prompt }],
+        }],
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 800,
+        },
       },
-    }),
-    {
-      probableDiagnoses: [],
-      medicineSuggestions: [],
-      clinicalAdvice: {
+      { timeout: 12000 }
+    );
+
+    const text = response?.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) return runMock();
+
+    // Gemini may wrap JSON in code fences; attempt a cleanup.
+    const cleaned = text
+      .trim()
+      .replace(/^```json\s*/i, '')
+      .replace(/^```\s*/i, '')
+      .replace(/```\s*$/i, '');
+
+    const parsed = JSON.parse(cleaned);
+
+    // Minimal shape normalization.
+    return {
+      probableDiagnoses: Array.isArray(parsed.probableDiagnoses) ? parsed.probableDiagnoses : [],
+      medicineSuggestions: Array.isArray(parsed.medicineSuggestions) ? parsed.medicineSuggestions : [],
+      clinicalAdvice: parsed.clinicalAdvice || {
         dietRecommendations: [],
         lifestyleRecommendations: [],
         followUpSuggestions: [],
         suggestedLabTests: [],
       },
-    }
-  );
-
-  // De-duplicate simple string lists.
-  merged.clinicalAdvice.dietRecommendations = [...new Set(merged.clinicalAdvice.dietRecommendations)];
-  merged.clinicalAdvice.lifestyleRecommendations = [...new Set(merged.clinicalAdvice.lifestyleRecommendations)];
-  merged.clinicalAdvice.followUpSuggestions = [...new Set(merged.clinicalAdvice.followUpSuggestions)];
-  merged.clinicalAdvice.suggestedLabTests = [...new Set(merged.clinicalAdvice.suggestedLabTests)];
-
-  return merged;
+    };
+  } catch (err) {
+    // Any error => fallback to mock. Never throw.
+    return runMock();
+  }
 }
 
 async function checkAllergyAlerts(allergies = [], suggestedMedicines = []) {
