@@ -47,6 +47,10 @@ async function findByIdOrPrescriptionNumber(identifier) {
 }
 
 async function createDraftWithAiSuggestion({ appointmentId, patientId, doctorId, symptoms, labReports }, actor, ipAddress) {
+  if (!patientId || !mongoose.Types.ObjectId.isValid(patientId)) {
+    throw new Error('Invalid patientId');
+  }
+
   const patient = await Patient.findById(patientId);
   if (!patient) throw new Error('Patient not found');
 

@@ -43,6 +43,15 @@ export async function verifyPrescription(id, notes) {
   return data.data;
 }
 
+// SRS Module 6 - Pharmacist permission: Suggest Alternatives.
+// Persists pharmacist alternative suggestions without modifying doctor-approved finalMedicines.
+export async function suggestAlternatives(id, items) {
+  const { data } = await api.post(`/prescriptions/${id}/suggest-alternatives`, { items });
+  return data.data;
+}
+
+
+
 export async function searchMedicines(query) {
   const { data } = await api.get('/medicines/search', { params: { q: query } });
   return data.data;

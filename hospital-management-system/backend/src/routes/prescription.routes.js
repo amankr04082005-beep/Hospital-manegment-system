@@ -39,7 +39,11 @@ router.get('/:id/pdf', ctrl.downloadPdf);
 // SRS Module 2.4 - Pharmacist permission: Verify Medicines
 router.post('/:id/verify', ctrl.verify);
 
+// SRS Module 6 - Pharmacist permission: Suggest Alternatives (no doctor override)
+router.post('/:id/suggest-alternatives', authorize('medicine:suggest-alternative'), ctrl.suggestAlternatives);
+
 // SRS Module 7 — AI Voice Assistant: persist captured conversation + generated clinical notes
 router.post('/:id/consultation-notes', authorize('prescription:approve'), ctrl.addConsultationNotes);
+
 
 module.exports = router;

@@ -1,5 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const QRCode = require('qrcode');
+const mongoose = require('mongoose');
 const Appointment = require('../models/Appointment');
 const Patient = require('../models/Patient');
 const Doctor = require('../models/Doctor');
@@ -13,7 +14,11 @@ async function bookAppointment(req, res, next) {
     if (req.user.role === 'patient') {
       patient = await Patient.findOne({ user: req.user._id });
     } else if (req.user.role === 'receptionist' && req.body.patientId) {
-      patient = await Patient.findById(req.body.patientId);
+      const patientId = req.body.patientId;
+      if (!patientId || !mongoose.Types.ObjectId.isValid(patientId)) {
+        return res.status(400).json({ success: false, message: 'Invalid patientId provided.' });
+      }
+      patient = await Patient.findById(patientId);
     }
     if (!patient) {
       return res.status(400).json({ success: false, message: 'Valid patient record required to book an appointment.' });

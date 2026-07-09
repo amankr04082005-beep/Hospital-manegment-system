@@ -6,6 +6,7 @@ import * as prescriptionService from '../../services/prescription.service';
 import * as emrService from '../../services/emr.service';
 import * as prescriptionHistoryService from '../../services/prescription.service';
 import * as medicineService from '../../services/medicine.service';
+import * as appointmentService from '../../services/appointment.service';
 import toast from 'react-hot-toast';
 import './ConsultationPage.css';
 
@@ -197,7 +198,10 @@ function MedicineRow({ medicine, index, isApproved, onUpdate, onRemove }) {
 export default function ConsultationPage() {
   const [params] = useSearchParams();
   const appointmentId = params.get('appointmentId') || '';
-  const patientId = params.get('patientId') || '';
+  const rawPatientId = params.get('patientId');
+  const initialPatientId = rawPatientId && rawPatientId !== 'undefined' && rawPatientId !== 'null' ? rawPatientId : '';
+
+  const [patientId, setPatientId] = useState(initialPatientId);
 
   const [symptoms, setSymptoms] = useState('');
   const [prescription, setPrescription] = useState(null);
@@ -240,8 +244,26 @@ export default function ConsultationPage() {
   useEffect(() => {
     async function loadHistory() {
       if (!patientId) {
-        setEmrLoading(false);
-        return;
+        // If patientId is missing but appointmentId exists, fetch appointment and derive patient
+        if (appointmentId) {
+          try {
+            const appt = await appointmentService.getAppointmentById(appointmentId);
+            if (appt && appt.patient && appt.patient._id) {
+              setPatientId(appt.patient._id);
+              // continue to load history using the newly set patientId
+            } else {
+              setEmrLoading(false);
+              return;
+            }
+          } catch (err) {
+            toast.error(err.response?.data?.message || 'Could not load appointment details.');
+            setEmrLoading(false);
+            return;
+          }
+        } else {
+          setEmrLoading(false);
+          return;
+        }
       }
       try {
         const data = await emrService.getPatientHistory(patientId);

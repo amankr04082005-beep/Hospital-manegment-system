@@ -9,9 +9,10 @@ import toast from 'react-hot-toast';
 // Lets the pharmacist look up same-composition substitute brands for a
 // prescribed medicine - e.g. if the exact brand is out of stock - without
 // changing what the doctor actually prescribed.
-function MedicineVerifyRow({ medicine }) {
+function MedicineVerifyRow({ medicine, onSuggest }) {
   const [alternatives, setAlternatives] = useState(null);
   const [loading, setLoading] = useState(false);
+
 
   async function handleViewAlternatives() {
     setLoading(true);
@@ -39,19 +40,42 @@ function MedicineVerifyRow({ medicine }) {
           >
             {loading ? 'Loading…' : 'Suggest alternatives'}
           </button>
+
           {alternatives && (
-            <div style={{ marginTop: 4 }}>
+            <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
               {alternatives.length === 0 ? (
                 <span style={{ fontSize: 11.5, color: 'var(--ink-soft)' }}>No alternatives found.</span>
               ) : (
-                alternatives.map((a) => (
-                  <span
-                    key={a._id}
-                    style={{ fontSize: 11.5, color: 'var(--ink-soft)', display: 'block' }}
+                <>
+                  <div>
+                    {alternatives.map((a) => (
+                      <span
+                        key={a._id}
+                        style={{ fontSize: 11.5, color: 'var(--ink-soft)', display: 'block' }}
+                      >
+                        {a.brandName} ({a.composition})
+                      </span>
+                    ))}
+                  </div>
+
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() =>
+                      onSuggest?.([
+                        {
+                          originalMedicine: medicine.brandName || medicine.genericName || medicine.composition,
+                          alternativeBrandName: alternatives[0]?.brandName,
+                          alternativeComposition: alternatives[0]?.composition,
+                          notes: 'Pharmacist suggested alternative brand (no doctor override).',
+                        },
+                      ])
+                    }
+                    style={{ alignSelf: 'flex-start' }}
                   >
-                    {a.brandName} ({a.composition})
-                  </span>
-                ))
+                    Save alternative
+                  </Button>
+                </>
               )}
             </div>
           )}
@@ -66,6 +90,7 @@ function MedicineVerifyRow({ medicine }) {
 
 export default function VerifyPrescriptionPage() {
   const [prescriptionId, setPrescriptionId] = useState('');
+
   const [prescription, setPrescription] = useState(null);
   const [searched, setSearched] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -95,6 +120,21 @@ export default function VerifyPrescriptionPage() {
       setVerifying(false);
     }
   }
+
+  async function handleSuggestAlternativesForMedicine(items) {
+    if (!prescription?._id) {
+      toast.error('Lookup prescription first.');
+      return;
+    }
+    try {
+      const updated = await prescriptionService.suggestAlternatives(prescription._id, items);
+      setPrescription(updated);
+      toast.success('Pharmacist alternative suggestion saved.');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not save alternatives.');
+    }
+  }
+
 
   return (
     <div>
@@ -143,7 +183,7 @@ export default function VerifyPrescriptionPage() {
                 </thead>
                 <tbody>
                   {(prescription.finalMedicines || []).map((m, i) => (
-                    <MedicineVerifyRow key={i} medicine={m} />
+                    <MedicineVerifyRow key={i} medicine={m} onSuggest={handleSuggestAlternativesForMedicine} />
                   ))}
                 </tbody>
               </table>

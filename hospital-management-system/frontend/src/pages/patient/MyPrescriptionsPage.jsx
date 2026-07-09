@@ -117,10 +117,19 @@ export default function MyPrescriptionsPage() {
 
   async function handleLookup(e) {
     e.preventDefault();
+
+    const id = prescriptionId.trim();
+    if (!id) {
+      toast.error('Please enter a prescription ID.');
+      setSearched(true);
+      setPrescription(null);
+      return;
+    }
+
     setLoading(true);
     setSearched(true);
     try {
-      const data = await prescriptionService.getPrescription(prescriptionId);
+      const data = await prescriptionService.getPrescription(id);
       setPrescription(data);
     } catch (err) {
       setPrescription(null);

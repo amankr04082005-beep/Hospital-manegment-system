@@ -40,7 +40,7 @@ const aiRecommendationSchema = new mongoose.Schema(
   {
     label: {
       type: String,
-      default: 'AI Suggested - Pending Doctor Approval', // Rule 1, hardcoded marker
+      default: 'AI Suggested - Pending Doctor Approval', // Rule 1
       immutable: true,
     },
     probableDiagnoses: [{ diagnosis: String, confidence: Number }],
@@ -100,6 +100,7 @@ const auditEventSchema = new mongoose.Schema(
         'prescription_shared',
         'consultation_notes_generated', // SRS Module 7
         'prescription_verified_by_pharmacist', // SRS Module 2.4
+        'pharmacist_alternative_suggestions', // Module 6 pharmacist suggestions
       ],
       required: true,
     },
@@ -111,6 +112,25 @@ const auditEventSchema = new mongoose.Schema(
   },
   { _id: false }
 );
+
+// Pharmacist alternatives suggestions (Module 6)
+const pharmacistAlternativeSuggestionSchema = new mongoose.Schema(
+  {
+    suggestedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    suggestedByName: String,
+    suggestedAt: { type: Date, default: Date.now },
+    items: [
+      {
+        originalMedicine: String, // brand/generic/composition text
+        alternativeBrandName: String,
+        alternativeComposition: String,
+        notes: String,
+      },
+    ],
+  },
+  { _id: false }
+);
+
 
 const prescriptionSchema = new mongoose.Schema(
   {
@@ -130,7 +150,7 @@ const prescriptionSchema = new mongoose.Schema(
     // SRS Module 7: AI Voice Assistant output — never directly patient-visible
     consultationNotes: consultationNotesSchema,
 
-    // Step 4/5: Doctor's final, reviewed content — this is what gets shared, NEVER the raw AI block
+    // Step 4/5: Doctor's final, reviewed content — this is what gets shared
     finalMedicines: [medicineItemSchema],
     finalAdvice: {
       dietAdvice: String,
@@ -165,16 +185,16 @@ const prescriptionSchema = new mongoose.Schema(
     hospitalSealApplied: { type: Boolean, default: false },
 
     // SRS Module 2.4 — Pharmacist permission: Verify Medicines.
-    // Tracks that a pharmacist has cross-checked the dosages/medicines
-    // against the doctor's approved prescription before dispensing.
-    // This never changes the medicines themselves — it is a checkpoint,
-    // not an edit — so the doctor's prescribing authority stays intact.
     pharmacistVerification: {
       verifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
       verifiedByName: String,
       verifiedAt: Date,
       notes: String,
     },
+
+    // Pharmacist alternatives suggestions (Module 6)
+    // IMPORTANT: MUST NOT change doctor-approved finalMedicines.
+    pharmacistAlternativeSuggestions: [pharmacistAlternativeSuggestionSchema],
 
     sharedVia: [{ type: String, enum: ['patient_portal', 'mobile_app', 'sms_link', 'email', 'print'] }],
     sharedAt: Date,
@@ -191,18 +211,24 @@ const prescriptionSchema = new mongoose.Schema(
 prescriptionSchema.index({ patient: 1, createdAt: -1 });
 prescriptionSchema.index({ status: 1 });
 
-// Guard: patient-facing serialization must strip AI block entirely (Rule 2)
-// and must also strip the raw consultation transcript/notes (SRS Module 7) —
-// these are clinical working material for the doctor, not patient-facing content.
+// Guard: patient-facing serialization must strip AI block + consultation notes.
 prescriptionSchema.methods.toPatientView = function toPatientView() {
-  if (this.status !== 'doctor_approved' && this.status !== 'prescription_generated' && this.status !== 'shared_with_patient') {
-    return null; // nothing to show before approval
+  if (
+    this.status !== 'doctor_approved' &&
+    this.status !== 'prescription_generated' &&
+    this.status !== 'shared_with_patient'
+  ) {
+    return null;
   }
+
   const obj = this.toObject();
   delete obj.aiRecommendation; // never expose raw AI suggestions to patient
   delete obj.consultationNotes; // never expose raw conversation transcript/notes to patient
   delete obj.auditTrail;
-  return obj;
+  // policy: hide pharmacist alternative suggestions from patient-facing view
+    delete obj.pharmacistAlternativeSuggestions;
+    return obj;
 };
 
 module.exports = mongoose.model('Prescription', prescriptionSchema);
+

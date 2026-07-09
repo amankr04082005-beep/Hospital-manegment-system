@@ -30,6 +30,11 @@ export async function forwardToDoctor(id) {
   return data.data;
 }
 
+export async function getAppointmentById(id) {
+  const { data } = await api.get(`/appointments/${id}`);
+  return data.data;
+}
+
 export async function getBranches() {
   const { data } = await api.get('/hospital/branches');
   return data.data;

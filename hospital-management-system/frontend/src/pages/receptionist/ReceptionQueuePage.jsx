@@ -91,6 +91,10 @@ export default function ReceptionQueuePage() {
                     </Button>
                   </>
                 )}
+
+                {/* Doctor queue me dikhane ke liye forward endpoint apt.status ko `in_progress` set karta hai.
+                    Patient booking ke baad receptionist forward tabhi karega jab status booked/confirmed ho. */}
+
               </div>
             </div>
 

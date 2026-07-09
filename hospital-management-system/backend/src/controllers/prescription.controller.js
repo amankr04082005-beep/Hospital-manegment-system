@@ -7,6 +7,15 @@ const { generateClinicalNotes } = require('../services/consultationNotes.service
 async function createDraft(req, res, next) {
   try {
     const { appointmentId, patientId, symptoms, labReports } = req.body;
+
+    // Prevents: "Cast to ObjectId failed for value \"undefined\" at path \"_id\" for model \"Patient\""
+    if (!appointmentId) {
+      return res.status(400).json({ success: false, message: 'appointmentId is required.' });
+    }
+    if (!patientId) {
+      return res.status(400).json({ success: false, message: 'patientId is required.' });
+    }
+
     const doctor = await Doctor.findOne({ user: req.user._id });
     if (!doctor) return res.status(403).json({ success: false, message: 'Doctor profile required.' });
 
@@ -212,4 +221,26 @@ async function addConsultationNotes(req, res, next) {
   }
 }
 
-module.exports = { createDraft, reviewDraft, approve, generate, share, getOne, getMine, getPatientHistory, downloadPdf, verify, addConsultationNotes };
+// POST /api/prescriptions/:id/suggest-alternatives (Pharmacist only)
+async function suggestAlternatives(req, res, next) {
+  try {
+    const { items } = req.body;
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ success: false, message: 'items[] is required.' });
+    }
+
+    const prescription = await prescriptionService.suggestPharmacistAlternatives(
+      req.params.id,
+      req.user,
+      { items },
+      req.ipAddress
+    );
+
+    res.json({ success: true, message: 'Alternatives suggested by pharmacist.', data: prescription });
+  } catch (error) {
+    next(error);
+  }
+}
+
+module.exports = { createDraft, reviewDraft, approve, generate, share, getOne, getMine, getPatientHistory, downloadPdf, verify, addConsultationNotes, suggestAlternatives };

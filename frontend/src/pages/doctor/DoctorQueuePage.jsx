@@ -34,9 +34,13 @@ export default function DoctorQueuePage() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <StatusPill status={apt.status} />
-              <Link to={`/doctor/consultations?appointmentId=${apt._id}&patientId=${apt.patient?._id}`}>
-                <Button size="sm">Start consultation</Button>
-              </Link>
+              {apt.patient && apt.patient._id ? (
+                <Link to={`/doctor/consultations?appointmentId=${apt._id}&patientId=${apt.patient._id}`}>
+                  <Button size="sm">Start consultation</Button>
+                </Link>
+              ) : (
+                <Button size="sm" disabled title="Patient record missing">Start consultation</Button>
+              )}
             </div>
           </Card>
         ))}

@@ -10,8 +10,14 @@ export default function DoctorQueuePage() {
   useEffect(() => {
     appointmentService
       .getTodaysAppointments()
-      .then(setAppointments)
+      .then((data) => {
+        // Backend forward endpoint sets status to `in_progress`.
+        // Patients can book appointments, but doctor should see only forwarded ones.
+        const filtered = (data || []).filter((a) => a.status === 'in_progress');
+        setAppointments(filtered);
+      })
       .catch(() => setAppointments([]));
+
   }, []);
 
   if (appointments === null) return <p style={{ color: 'var(--ink-soft)' }}>Loading…</p>;
@@ -34,7 +40,9 @@ export default function DoctorQueuePage() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <StatusPill status={apt.status} />
-              <Link to={`/doctor/consultations?appointmentId=${apt._id}&patientId=${apt.patient?._id}`}>
+              <Link
+                to={`/doctor/consultations?appointmentId=${apt._id}&patientId=${apt.patient?._id || apt.patient}`}
+              >
                 <Button size="sm">Start consultation</Button>
               </Link>
             </div>

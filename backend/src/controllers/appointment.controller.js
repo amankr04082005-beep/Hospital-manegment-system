@@ -1,5 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const QRCode = require('qrcode');
+const mongoose = require('mongoose');
 const Appointment = require('../models/Appointment');
 const Patient = require('../models/Patient');
 const Doctor = require('../models/Doctor');
@@ -13,7 +14,11 @@ async function bookAppointment(req, res, next) {
     if (req.user.role === 'patient') {
       patient = await Patient.findOne({ user: req.user._id });
     } else if (req.user.role === 'receptionist' && req.body.patientId) {
-      patient = await Patient.findById(req.body.patientId);
+      const patientId = req.body.patientId;
+      if (!patientId || !mongoose.Types.ObjectId.isValid(patientId)) {
+        return res.status(400).json({ success: false, message: 'Invalid patientId provided.' });
+      }
+      patient = await Patient.findById(patientId);
     }
     if (!patient) {
       return res.status(400).json({ success: false, message: 'Valid patient record required to book an appointment.' });
@@ -174,4 +179,27 @@ module.exports = {
   updateStatus,
   reschedule,
   forwardToDoctor,
+  // new: fetch single appointment
+  getAppointmentById,
 };
+
+// GET /api/appointments/:id — fetch single appointment (populated)
+async function getAppointmentById(req, res, next) {
+  try {
+    const id = req.params.id;
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid appointment id.' });
+    }
+
+    const appointment = await Appointment.findById(id)
+      .populate('patient')
+      .populate({ path: 'doctor', populate: { path: 'user', select: 'fullName' } })
+      .populate('department')
+      .populate('branch');
+
+    if (!appointment) return res.status(404).json({ success: false, message: 'Appointment not found.' });
+    res.json({ success: true, data: appointment });
+  } catch (error) {
+    next(error);
+  }
+}

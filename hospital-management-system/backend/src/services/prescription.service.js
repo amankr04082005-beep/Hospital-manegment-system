@@ -47,8 +47,17 @@ async function findByIdOrPrescriptionNumber(identifier) {
 }
 
 async function createDraftWithAiSuggestion({ appointmentId, patientId, doctorId, symptoms, labReports }, actor, ipAddress) {
+  // Guard against frontend/body mapping issues causing Mongoose cast errors
+  if (patientId === undefined || patientId === null || patientId === '' ) {
+    throw new Error('patientId is required (createDraftWithAiSuggestion).');
+  }
+  if (appointmentId === undefined || appointmentId === null || appointmentId === '' ) {
+    throw new Error('appointmentId is required (createDraftWithAiSuggestion).');
+  }
+
   const patient = await Patient.findById(patientId);
   if (!patient) throw new Error('Patient not found');
+
 
   const aiRecommendation = await aiService.generateClinicalRecommendation({
     symptoms,
@@ -229,6 +238,54 @@ async function getMyPrescriptions(patientUserId) {
  * built from toPatientView() data, so the AI block / consultation notes /
  * audit trail can never leak into a downloadable file.
  */
+async function suggestPharmacistAlternatives(prescriptionId, pharmacistActor, { items }, ipAddress) {
+  if (!pharmacistActor || pharmacistActor.role !== 'pharmacist') {
+    throw new Error('Forbidden: only pharmacists may suggest alternatives.');
+  }
+
+  const prescription = await Prescription.findById(prescriptionId);
+  if (!prescription) throw new Error('Prescription not found');
+
+  // Do not allow pharmacist to override doctor-approved finalMedicines.
+  // Allow suggestions after at least doctor approval (under_review/approved).
+  if (!['doctor_approved', 'prescription_generated', 'shared_with_patient'].includes(prescription.status)) {
+    throw new Error('Alternatives can only be suggested for doctor-approved prescriptions.');
+  }
+
+  // Basic normalization/validation
+  const safeItems = (items || []).map((it) => ({
+    originalMedicine: it.originalMedicine,
+    alternativeBrandName: it.alternativeBrandName,
+    alternativeComposition: it.alternativeComposition,
+    notes: it.notes || '',
+  }));
+
+  prescription.pharmacistAlternativeSuggestions = [
+    {
+      suggestedBy: pharmacistActor._id,
+      suggestedByName: pharmacistActor.fullName,
+      suggestedAt: new Date(),
+      items: safeItems,
+    },
+  ];
+
+  appendAudit(
+    prescription,
+    'pharmacist_alternative_suggestions',
+    pharmacistActor,
+    { items: safeItems.map((x) => ({
+      originalMedicine: x.originalMedicine,
+      alternativeBrandName: x.alternativeBrandName,
+      alternativeComposition: x.alternativeComposition,
+      notes: x.notes,
+    })) },
+    ipAddress
+  );
+
+  await prescription.save();
+  return prescription;
+}
+
 async function generatePrescriptionPdf(identifier) {
   const prescription = await findByIdOrPrescriptionNumber(identifier);
   if (!prescription) return null;
@@ -312,4 +369,5 @@ module.exports = {
   getMyPrescriptions,
   generatePrescriptionPdf,
   getPreviousPrescriptionsForPatient,
+  suggestPharmacistAlternatives,
 };
