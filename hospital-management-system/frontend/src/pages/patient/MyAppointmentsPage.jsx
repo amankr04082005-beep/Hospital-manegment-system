@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Card, EmptyState } from '../../components/common/ui';
+import { Card, EmptyState, Button } from '../../components/common/ui';
 import { StatusPill } from '../../components/common/StatusBadges';
 import * as appointmentService from '../../services/appointment.service';
 import * as prescriptionService from '../../services/prescription.service';
 import { format } from 'date-fns';
+
 
 // SRS Module 2.1 — Patient permission: Track Follow-up Appointments.
 // Pulls every prescription's followUpDate, keeps only future dates,
