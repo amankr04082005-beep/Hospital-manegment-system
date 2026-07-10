@@ -70,23 +70,33 @@ function UpcomingFollowUps() {
 export default function MyAppointmentsPage() {
   const [appointments, setAppointments] = useState(null);
 
+  async function loadAppointments() {
+    try {
+      const data = await appointmentService.getMyAppointments();
+      console.log('[MyAppointmentsPage] /appointments/mine response:', data);
+      setAppointments(data || []);
+    } catch (err) {
+      console.error('[MyAppointmentsPage] /appointments/mine failed:', err);
+      setAppointments([]);
+    }
+  }
+
   useEffect(() => {
-    appointmentService
-      .getMyAppointments()
-      .then((data) => {
-        console.log('[MyAppointmentsPage] /appointments/mine response:', data);
-        setAppointments(data);
-      })
-      .catch((err) => {
-        console.error('[MyAppointmentsPage] /appointments/mine failed:', err);
-        setAppointments([]);
-      });
+    loadAppointments();
   }, []);
+
 
 
   return (
     <div>
       <h1 style={{ marginBottom: 20 }}>My appointments</h1>
+
+      <div style={{ marginBottom: 14 }}>
+        <Button variant="secondary" size="sm" onClick={loadAppointments}>
+          Refresh
+        </Button>
+      </div>
+
 
       <UpcomingFollowUps />
 
