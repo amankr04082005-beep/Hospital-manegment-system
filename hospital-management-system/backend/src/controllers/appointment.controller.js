@@ -90,7 +90,14 @@ async function getTodaysAppointments(req, res, next) {
 // GET /api/appointments/mine — Patient's own appointments
 async function getMyAppointments(req, res, next) {
   try {
+    console.log('[getMyAppointments] req.user:', {
+      id: req.user?._id,
+      role: req.user?.role,
+    });
+
     const patient = await Patient.findOne({ user: req.user._id });
+    console.log('[getMyAppointments] patient found:', patient?._id);
+
     if (!patient) {
       const message =
         process.env.NODE_ENV === 'development'
@@ -99,11 +106,12 @@ async function getMyAppointments(req, res, next) {
       return res.json({ success: true, data: [], ...(message ? { message } : {}) });
     }
 
-
     const appointments = await Appointment.find({ patient: patient._id })
       .populate({ path: 'doctor', populate: { path: 'user', select: 'fullName' } })
       .populate('department')
       .sort({ appointmentDate: -1 });
+
+    console.log('[getMyAppointments] appointments count:', appointments.length);
 
     res.json({ success: true, data: appointments });
   } catch (error) {

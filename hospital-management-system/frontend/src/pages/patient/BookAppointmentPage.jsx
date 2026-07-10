@@ -71,7 +71,16 @@ export default function BookAppointmentPage() {
         {confirmed.qrCodeDataUrl && (
           <img src={confirmed.qrCodeDataUrl} alt="Appointment QR code" width={160} height={160} style={{ marginBottom: 16 }} />
         )}
-        <Button onClick={() => setConfirmed(null)}>Book another appointment</Button>
+        <Button
+          onClick={() => {
+            // Clear confirmation and keep the user on the booking page.
+            // This prevents any UI flash caused by parent route updates.
+            setConfirmed(null);
+            window.scrollTo({ top: 0, behavior: 'instant' });
+          }}
+        >
+          Book another appointment
+        </Button>
       </Card>
     );
   }
