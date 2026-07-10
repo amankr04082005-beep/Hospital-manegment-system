@@ -1,5 +1,5 @@
 const Medicine = require('../models/Medicine');
-const drugDatabaseService = require('../services/drugDatabase.service');
+
 
 // GET /api/medicines/search?q=Dolo  — Module 6: Search by brand/generic/composition
 async function search(req, res, next) {
@@ -38,43 +38,7 @@ async function getAlternatives(req, res, next) {
   }
 }
 
-// GET /api/medicines/lookup?name=Paracetamol
-async function lookupExternal(req, res, next) {
-  try {
-    const { name } = req.query;
-    if (!name || !name.trim()) {
-      return res.status(400).json({ success: false, message: 'Query param "name" is required.' });
-    }
 
-    const result = await drugDatabaseService.lookupDrug(name.trim());
-
-    if (!result.found) {
-      return res.status(404).json({
-        success: false,
-        message: `No drug information found for "${name}" in local database or OpenFDA.`,
-      });
-    }
-
-    res.json({ success: true, source: result.source, data: result.data });
-  } catch (error) {
-    next(error);
-  }
-}
-
-// POST /api/medicines/lookup-batch  { drugNames: ["Paracetamol", "Amoxicillin"] }
-async function lookupBatch(req, res, next) {
-  try {
-    const { drugNames } = req.body;
-    if (!Array.isArray(drugNames) || drugNames.length === 0) {
-      return res.status(400).json({ success: false, message: '"drugNames" must be a non-empty array.' });
-    }
-
-    const results = await drugDatabaseService.lookupMultipleDrugs(drugNames);
-    res.json({ success: true, data: results });
-  } catch (error) {
-    next(error);
-  }
-}
 
 // GET /api/medicines/inventory
 // SRS Module 2.4 — Pharmacist permission: Manage Inventory.
@@ -115,4 +79,4 @@ async function updateStock(req, res, next) {
   }
 }
 
-module.exports = { search, getAlternatives, lookupExternal, lookupBatch, getInventory, updateStock };
+module.exports = { search, getAlternatives, getInventory, updateStock };

@@ -18,14 +18,11 @@ const Medicine = require('../models/Medicine');
 
 const AI_LABEL = 'AI Suggested - Pending Doctor Approval'; // Rule 1
 
-// --- Optional real AI provider (Gemini) ---
-// Default is MOCK to avoid network issues / quota / missing API keys.
-// To enable Gemini (free tier), set:
-//   AI_ENGINE=gemini
-//   GEMINI_API_KEY=...
-// If Gemini fails for ANY reason, we fallback to MOCK so there are no runtime errors.
-const AI_ENGINE = process.env.AI_ENGINE || 'mock';
+// External AI providers (e.g., Gemini)
+// Strategy: Gemini-first, with safe fallback to MOCK on missing key / failures.
+const AI_ENGINE = process.env.AI_ENGINE || 'gemini';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || null;
+
 
 // Simple keyword -> clinical suggestion knowledge base.
 // Each entry mimics what an LLM might return for that symptom pattern.
@@ -208,23 +205,15 @@ async function callLanguageModel({ symptoms = '' }) {
     return merged;
   };
 
-  if (AI_ENGINE !== 'gemini') {
-    return runMock();
-  }
+  // Gemini-first strategy
+  if (AI_ENGINE === 'gemini' && GEMINI_API_KEY) {
+    try {
+      const axios = require('axios');
 
-  if (!GEMINI_API_KEY) {
-    // Gemini enabled but key missing => mock.
-    return runMock();
-  }
+      // Gemini free-tier via API key.
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
-  try {
-    const axios = require('axios');
-
-    // Gemini free-tier via API key.
-    // Using REST endpoint directly to avoid adding SDK dependencies.
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-
-    const prompt = `You are a clinical decision support assistant for doctors.
+      const prompt = `You are a clinical decision support assistant for doctors.
 Return ONLY valid JSON matching this schema:
 {
   "probableDiagnoses": [{"diagnosis": string, "confidence": number}],
@@ -241,48 +230,51 @@ Symptoms: ${symptoms}
 
 Important: Provide safe, general suggestions for doctor review. Do not include anything non-JSON.`;
 
-    const response = await axios.post(
-      url,
-      {
-        contents: [{
-          role: 'user',
-          parts: [{ text: prompt }],
-        }],
-        generationConfig: {
-          temperature: 0.2,
-          maxOutputTokens: 800,
+      const response = await axios.post(
+        url,
+        {
+          contents: [{
+            role: 'user',
+            parts: [{ text: prompt }],
+          }],
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 800,
+          },
         },
-      },
-      { timeout: 12000 }
-    );
+        { timeout: 12000 }
+      );
 
-    const text = response?.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) return runMock();
+      const text = response?.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) return runMock();
 
-    // Gemini may wrap JSON in code fences; attempt a cleanup.
-    const cleaned = text
-      .trim()
-      .replace(/^```json\s*/i, '')
-      .replace(/^```\s*/i, '')
-      .replace(/```\s*$/i, '');
+      // Gemini may wrap JSON in code fences; attempt a cleanup.
+      const cleaned = text
+        .trim()
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/i, '')
+        .replace(/```\s*$/i, '');
 
-    const parsed = JSON.parse(cleaned);
+      const parsed = JSON.parse(cleaned);
 
-    // Minimal shape normalization.
-    return {
-      probableDiagnoses: Array.isArray(parsed.probableDiagnoses) ? parsed.probableDiagnoses : [],
-      medicineSuggestions: Array.isArray(parsed.medicineSuggestions) ? parsed.medicineSuggestions : [],
-      clinicalAdvice: parsed.clinicalAdvice || {
-        dietRecommendations: [],
-        lifestyleRecommendations: [],
-        followUpSuggestions: [],
-        suggestedLabTests: [],
-      },
-    };
-  } catch (err) {
-    // Any error => fallback to mock. Never throw.
-    return runMock();
+      return {
+        probableDiagnoses: Array.isArray(parsed.probableDiagnoses) ? parsed.probableDiagnoses : [],
+        medicineSuggestions: Array.isArray(parsed.medicineSuggestions) ? parsed.medicineSuggestions : [],
+        clinicalAdvice: parsed.clinicalAdvice || {
+          dietRecommendations: [],
+          lifestyleRecommendations: [],
+          followUpSuggestions: [],
+          suggestedLabTests: [],
+        },
+      };
+    } catch (err) {
+      // Any error => fallback to mock. Never throw.
+      return runMock();
+    }
   }
+
+  // No Gemini key / Gemini disabled => mock fallback
+  return runMock();
 }
 
 async function checkAllergyAlerts(allergies = [], suggestedMedicines = []) {

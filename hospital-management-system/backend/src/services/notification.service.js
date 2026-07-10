@@ -97,59 +97,46 @@ async function sendSmsFast2SMS({ to, message }) {
 }
 
 async function sharePrescriptionNotifications({ prescription, channels }) {
-  // Best-effort: return summary but never throw.
-  const normalized = normalizeChannels(channels);
-
-  const result = {
-    ok: true,
-    email: { ok: null },
-    sms: { ok: null },
-  };
-
+  // Best-effort notifications: never throw.
+  // channels can be:
+  // - array of enum strings e.g. ['email','sms']
+  // - object payload containing { sharedVia: ['email','sms'], email: {...}, sms: {...} }
   try {
-    const toEmail = normalized.email || normalized.toEmail || null;
-    const toSms = normalized.sms || normalized.toSms || null;
+    const sharedVia = Array.isArray(channels)
+      ? channels
+      : (channels?.sharedVia || channels?.channels?.sharedVia || channels?.channels || []);
 
-    const prescriptionNumber = prescription?.prescriptionNumber || 'Prescription';
+    const emailTo = channels?.email?.to || channels?.email || prescription?.patient?.user?.email || null;
+    const smsTo = channels?.sms?.to || channels?.sms || prescription?.patient?.user?.phone || null;
 
-    const emailHtml = `
-      <p>Hello,</p>
-      <p>Your <b>${prescriptionNumber}</b> prescription has been shared with you.</p>
-      <p>Please login to the portal to view/download the PDF.</p>
-    `;
+    const subject = `Prescription Ready: ${prescription?.prescriptionNumber || ''}`.trim();
+    const html = `<p>Your prescription is ready.</p>
+                  <p>Prescription Number: <b>${prescription?.prescriptionNumber || '-'}</b></p>`;
+    const message = `Your prescription is ready. RX: ${prescription?.prescriptionNumber || '-'}`;
 
-    const smsMessage = `Your ${prescriptionNumber} prescription is ready. Please check the portal/app.`;
+    const sendTasks = [];
+    if (sharedVia.includes('email') && emailTo) {
+      sendTasks.push(sendEmailBrevo({ to: emailTo, subject, html }));
+    }
+    if (sharedVia.includes('sms') && smsTo) {
+      sendTasks.push(sendSmsFast2SMS({ to: smsTo, message }));
+    }
 
-    const [emailRes, smsRes] = await Promise.all([
-      toEmail
-        ? sendEmailBrevo({
-            to: toEmail,
-            subject: `Prescription Shared: ${prescriptionNumber}`,
-            html: emailHtml,
-          })
-        : Promise.resolve({ ok: false, reason: 'missing_to', channel: 'email' }),
+    const results = await Promise.all(sendTasks);
 
-      toSms
-        ? sendSmsFast2SMS({
-            to: toSms,
-            message: smsMessage,
-          })
-        : Promise.resolve({ ok: false, reason: 'missing_to', channel: 'sms' }),
-    ]);
-
-    result.email = emailRes;
-    result.sms = smsRes;
-
-    // overall ok only if at least one channel succeeded
-    result.ok = Boolean(emailRes?.ok || smsRes?.ok);
-    return result;
-  } catch (err) {
-    result.ok = false;
-    return result;
+    return {
+      ok: results.every((r) => r?.ok === true),
+      results,
+      prescriptionId: prescription?._id || null,
+    };
+  } catch (e) {
+    return { ok: false, reason: 'notification_dispatch_failed' };
   }
 }
+
 
 module.exports = {
   sharePrescriptionNotifications,
 };
+
 

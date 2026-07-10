@@ -7,8 +7,7 @@ const router = express.Router();
 router.use(authenticate);
 
 router.get('/search', ctrl.search);
-router.get('/lookup', ctrl.lookupExternal);
-router.post('/lookup-batch', ctrl.lookupBatch);
+
 
 // SRS Module 2.4 — Pharmacist permission: Manage Inventory.
 // Registered before '/:id/alternatives' is fine here since 'inventory'
