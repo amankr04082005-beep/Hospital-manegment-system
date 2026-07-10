@@ -69,14 +69,41 @@ async function bookAppointment(req, res, next) {
 // without needing to rewrite how dates are stored everywhere else.
 async function getTodaysAppointments(req, res, next) {
   try {
-    const start = new Date();
-    start.setDate(start.getDate() - 1);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date();
-    end.setDate(end.getDate() + 1);
-    end.setHours(23, 59, 59, 999);
+    // appointmentDate is often sent as a YYYY-MM-DD string from <input type="date">.
+    // That gets interpreted/serialized with timezone rules. To make "today queue"
+    // stable across timezones, build boundaries using the client's local day but
+    // compare using UTC-safe day boundaries.
 
-    const appointments = await Appointment.find({ appointmentDate: { $gte: start, $lte: end } })
+    const now = new Date();
+
+    // Use local date parts (year/month/day) then convert to UTC boundaries.
+    // This avoids "late night" appointments falling into the wrong day window.
+    const todayLocal = {
+      y: now.getFullYear(),
+      m: now.getMonth(),
+      d: now.getDate(),
+    };
+
+    const startLocal = new Date(todayLocal.y, todayLocal.m, todayLocal.d - 1, 0, 0, 0, 0);
+    const endLocal = new Date(todayLocal.y, todayLocal.m, todayLocal.d + 1, 23, 59, 59, 999);
+
+    const start = new Date(Date.UTC(
+      startLocal.getFullYear(),
+      startLocal.getMonth(),
+      startLocal.getDate(),
+      0, 0, 0, 0
+    ));
+
+    const end = new Date(Date.UTC(
+      endLocal.getFullYear(),
+      endLocal.getMonth(),
+      endLocal.getDate(),
+      23, 59, 59, 999
+    ));
+
+    const appointments = await Appointment.find({
+      appointmentDate: { $gte: start, $lte: end },
+    })
       .populate('patient')
       .populate({ path: 'doctor', populate: { path: 'user', select: 'fullName' } })
       .sort({ timeSlot: 1 });
@@ -87,9 +114,12 @@ async function getTodaysAppointments(req, res, next) {
   }
 }
 
+
+
 // GET /api/appointments/mine — Patient's own appointments
 async function getMyAppointments(req, res, next) {
   try {
+
     console.log('[getMyAppointments] req.user:', {
       id: req.user?._id,
       role: req.user?.role,
