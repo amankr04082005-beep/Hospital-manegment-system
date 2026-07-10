@@ -74,26 +74,11 @@ export default function MyAppointmentsPage() {
   async function loadAppointments() {
     try {
       const raw = await appointmentService.getMyAppointments();
-      console.log('[MyAppointmentsPage] /appointments/mine raw response:', raw);
 
-      // Frontend expects an array. Backend should return { success, data } where
-      // data is an array, but in case of shape mismatch we normalize defensively.
-      let normalized = [];
-      if (Array.isArray(raw)) {
-        normalized = raw;
-      } else if (raw && Array.isArray(raw.data)) {
-        normalized = raw.data;
-      } else if (raw?.data && Array.isArray(raw.data.appointments)) {
-        normalized = raw.data.appointments;
-      } else if (raw?.data?.appointments && Array.isArray(raw.data.appointments)) {
-        normalized = raw.data.appointments;
-      }
+      // appointmentService.getMyAppointments() should already return appointments[]
+      setAppointments(Array.isArray(raw) ? raw : []);
 
-      if (!Array.isArray(normalized)) normalized = [];
-      console.log('[MyAppointmentsPage] /appointments/mine normalized appointments:', normalized);
-      setAppointments(normalized);
     } catch (err) {
-      console.error('[MyAppointmentsPage] /appointments/mine failed:', err);
       setAppointments([]);
     }
   }

@@ -7,8 +7,10 @@ export async function bookAppointment(payload) {
 
 export async function getMyAppointments() {
   const { data } = await api.get('/appointments/mine');
-  return data.data;
+  // Backend contract: { success: true, data: appointments[] }
+  return data?.data;
 }
+
 
 export async function getTodaysAppointments() {
   const { data } = await api.get('/appointments/today');
