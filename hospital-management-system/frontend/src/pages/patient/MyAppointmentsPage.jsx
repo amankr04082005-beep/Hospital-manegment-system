@@ -71,8 +71,18 @@ export default function MyAppointmentsPage() {
   const [appointments, setAppointments] = useState(null);
 
   useEffect(() => {
-    appointmentService.getMyAppointments().then(setAppointments).catch(() => setAppointments([]));
+    appointmentService
+      .getMyAppointments()
+      .then((data) => {
+        console.log('[MyAppointmentsPage] /appointments/mine response:', data);
+        setAppointments(data);
+      })
+      .catch((err) => {
+        console.error('[MyAppointmentsPage] /appointments/mine failed:', err);
+        setAppointments([]);
+      });
   }, []);
+
 
   return (
     <div>

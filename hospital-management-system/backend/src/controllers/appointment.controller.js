@@ -91,7 +91,14 @@ async function getTodaysAppointments(req, res, next) {
 async function getMyAppointments(req, res, next) {
   try {
     const patient = await Patient.findOne({ user: req.user._id });
-    if (!patient) return res.json({ success: true, data: [] });
+    if (!patient) {
+      const message =
+        process.env.NODE_ENV === 'development'
+          ? 'Patient profile missing for this logged-in user. (Patient.findOne({ user: req.user._id }) returned null.)'
+          : undefined;
+      return res.json({ success: true, data: [], ...(message ? { message } : {}) });
+    }
+
 
     const appointments = await Appointment.find({ patient: patient._id })
       .populate({ path: 'doctor', populate: { path: 'user', select: 'fullName' } })

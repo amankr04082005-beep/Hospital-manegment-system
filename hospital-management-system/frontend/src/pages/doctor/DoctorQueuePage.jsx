@@ -11,10 +11,11 @@ export default function DoctorQueuePage() {
     appointmentService
       .getTodaysAppointments()
       .then((data) => {
-        // Backend forward endpoint sets status to `in_progress`.
-        // Patients can book appointments, but doctor should see only forwarded ones.
-        const filtered = (data || []).filter((a) => a.status === 'in_progress');
+        // Patients can book appointments, and doctor should see them immediately.
+        // (Forward to in_progress can still be used later in the workflow.)
+        const filtered = (data || []).filter((a) => ['booked', 'in_progress'].includes(a.status));
         setAppointments(filtered);
+
       })
       .catch(() => setAppointments([]));
 
