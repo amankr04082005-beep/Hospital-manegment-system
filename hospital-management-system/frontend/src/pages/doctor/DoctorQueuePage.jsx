@@ -42,10 +42,12 @@ export default function DoctorQueuePage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <StatusPill status={apt.status} />
               <Link
-                to={`/doctor/consultations?appointmentId=${apt._id}&patientId=${apt.patient?._id || apt.patient}`}
+                to={`/doctor/consultations?appointmentId=${apt._id}&patientId=${apt.patient?._id || (typeof apt.patient === 'string' ? apt.patient : '')}`}
               >
+
                 <Button size="sm">Start consultation</Button>
               </Link>
+
             </div>
           </Card>
         ))}

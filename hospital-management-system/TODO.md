@@ -1,9 +1,12 @@
-# hospital-management-system - TODO
+# TODO
 
-- [x] Identify likely failure: consultation-notes endpoint uses wrong RBAC permission.
-- [x] Update backend route guard for `POST /api/prescriptions/:id/consultation-notes` from `prescription:approve` to `consultation:conduct`.
-- [ ] Ensure `consultation:conduct` exists in `backend/src/config/roles.js` for `doctor` (add if missing).
-- [ ] Restart backend and test doctor voice/consultation flow.
-- [ ] If still failing, capture Network error (status + response message) and patch remaining mismatch.
+## Appointment visibility fix — Patient "My appointments"
 
+- [ ] Investigate why the frontend shows "No appointments yet" even after booking.
+- [ ] Verify API response shape from `GET /appointments/mine` and how frontend renders it.
+ - [ ] Ensure patient appointments load correctly and that upcoming follow-ups do not break page render.
+- [ ] Add defensive rendering + mapping for potential response variations.
+- [ ] Add console logging or UI fallback if API returns unexpected format.
+- [ ] Implement fix in `frontend/src/pages/patient/MyAppointmentsPage.jsx` (and any needed service/controller updates).
+- [ ] Run frontend build/tests and verify appointment list renders.
 

@@ -13,11 +13,19 @@ function authorize(...requiredPermissions) {
     const hasAll = requiredPermissions.every((p) => userPermissions.includes(p));
 
     if (!hasAll) {
+      // Helpful for debugging permission mismatches (client will still see 403 + message)
+      console.warn('[rbac] DENY', {
+        role: req.user.role,
+        requiredPermissions,
+        userPermissions,
+      });
+
       return res.status(403).json({
         success: false,
         message: `Forbidden: role '${req.user.role}' lacks required permission(s): ${requiredPermissions.join(', ')}`,
       });
     }
+
 
     next();
   };
