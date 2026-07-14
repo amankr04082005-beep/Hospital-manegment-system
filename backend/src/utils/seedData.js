@@ -6,6 +6,7 @@ const Patient = require('../models/Patient');
 const Doctor = require('../models/Doctor');
 const { Branch, Department } = require('../models/Branch');
 const Medicine = require('../models/Medicine');
+const Appointment = require('../models/Appointment');
 
 async function seed() {
   await connectDB();
@@ -18,6 +19,7 @@ async function seed() {
     Branch.deleteMany({}),
     Department.deleteMany({}),
     Medicine.deleteMany({}),
+    Appointment.deleteMany({}),
   ]);
 
   const branch = await Branch.create({
@@ -31,6 +33,12 @@ async function seed() {
     name: 'General Medicine',
     branch: branch._id,
     description: 'General physician consultations',
+  });
+
+  const homeopathyDept = await Department.create({
+    name: 'Homeopathy',
+    branch: branch._id,
+    description: 'Homeopathic consultations',
   });
 
   const adminUser = await User.create({
@@ -57,6 +65,25 @@ async function seed() {
     specialization: 'General Medicine',
     yearsOfExperience: 10,
     consultationFee: 500,
+    availability: [{ dayOfWeek: 1, startTime: '09:00', endTime: '17:00', slotDurationMinutes: 15 }],
+  });
+
+  const homeopathyDoctorUser = await User.create({
+    fullName: 'Dr. Priya Sharma',
+    email: 'homeodoctor@hospital.com',
+    mobileNumber: '+919900000010',
+    password: 'Doctor@1234',
+    role: 'doctor',
+  });
+
+  const homeopathyDoctorProfile = await Doctor.create({
+    user: homeopathyDoctorUser._id,
+    qualification: 'BHMS',
+    registrationNumber: 'KMC-2016-00512',
+    department: homeopathyDept._id,
+    specialization: 'Homeopathy',
+    yearsOfExperience: 8,
+    consultationFee: 400,
     availability: [{ dayOfWeek: 1, startTime: '09:00', endTime: '17:00', slotDurationMinutes: 15 }],
   });
 
@@ -141,12 +168,13 @@ async function seed() {
       contraindications: ['kidney_disease'],
       interactsWith: [{ composition: 'Warfarin', severity: 'moderate', note: 'May increase bleeding risk' }],
     },
-  ]);
 
+  ]);
   console.log('Seed complete.');
   console.log('Demo logins:');
   console.log('  Admin:        admin@hospital.com / Admin@1234');
   console.log('  Doctor:       doctor@hospital.com / Doctor@1234');
+  console.log('  Homeo Doctor: homeodoctor@hospital.com / Doctor@1234');
   console.log('  Receptionist: reception@hospital.com / Reception@1234');
   console.log('  Pharmacist:   pharmacist@hospital.com / Pharmacist@1234');
   console.log('  Patient:      patient@hospital.com / Patient@1234');

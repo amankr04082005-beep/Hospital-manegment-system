@@ -1,4 +1,5 @@
 const Medicine = require('../models/Medicine');
+const { SYMPTOM_KNOWLEDGE_BASE, DEFAULT_SUGGESTION } = require('../data/symptomKnowledgeBase');
 
 /**
  * SRS Module 5 — Step 2 & 3: AI Analysis + AI Recommendations.
@@ -14,120 +15,17 @@ const Medicine = require('../models/Medicine');
  * grading, and offline development. The output shape is identical to
  * what a real LLM-backed implementation would return, so this can be
  * swapped for a real API call later without touching any other file.
+ *
+ * The symptom -> diagnosis/medicine knowledge base itself lives in
+ * ../data/symptomKnowledgeBase.js so it can grow independently of this
+ * service's matching/merging logic.
  */
 
 const AI_LABEL = 'AI Suggested - Pending Doctor Approval'; // Rule 1
 
-// Simple keyword -> clinical suggestion knowledge base.
-// Each entry mimics what an LLM might return for that symptom pattern.
-const SYMPTOM_KNOWLEDGE_BASE = [
-  {
-    keywords: ['fever', 'temperature', 'chills'],
-    probableDiagnoses: [
-      { diagnosis: 'Viral fever', confidence: 0.7 },
-      { diagnosis: 'Common cold / Upper respiratory infection', confidence: 0.5 },
-    ],
-    medicineSuggestions: [
-      {
-        brandName: 'Dolo 650',
-        genericName: 'Paracetamol',
-        composition: 'Paracetamol 650mg',
-        dosage: '1 tablet',
-        frequency: 'Every 6-8 hours as needed',
-        durationDays: 3,
-        instructions: 'Take after food. Do not exceed 4 tablets in 24 hours.',
-      },
-    ],
-    clinicalAdvice: {
-      dietRecommendations: ['Drink plenty of fluids', 'Light, easily digestible meals'],
-      lifestyleRecommendations: ['Adequate rest', 'Avoid strenuous activity'],
-      followUpSuggestions: ['Follow up if fever persists beyond 3 days'],
-      suggestedLabTests: ['CBC if fever persists beyond 3 days'],
-    },
-  },
-  {
-    keywords: ['cough', 'cold', 'sore throat', 'throat pain'],
-    probableDiagnoses: [
-      { diagnosis: 'Acute upper respiratory tract infection', confidence: 0.65 },
-    ],
-    medicineSuggestions: [
-      {
-        brandName: 'Benadryl',
-        genericName: 'Diphenhydramine',
-        composition: 'Diphenhydramine 12.5mg',
-        dosage: '10ml',
-        frequency: 'Twice daily',
-        durationDays: 5,
-        instructions: 'Take after food. May cause drowsiness.',
-      },
-    ],
-    clinicalAdvice: {
-      dietRecommendations: ['Warm fluids', 'Avoid cold drinks/ice cream'],
-      lifestyleRecommendations: ['Steam inhalation', 'Gargle with warm salt water'],
-      followUpSuggestions: ['Follow up if symptoms persist beyond 5-7 days'],
-      suggestedLabTests: [],
-    },
-  },
-  {
-    keywords: ['headache', 'migraine'],
-    probableDiagnoses: [{ diagnosis: 'Tension headache', confidence: 0.6 }],
-    medicineSuggestions: [
-      {
-        brandName: 'Crocin',
-        genericName: 'Paracetamol',
-        composition: 'Paracetamol 500mg',
-        dosage: '1 tablet',
-        frequency: 'Every 8 hours as needed',
-        durationDays: 2,
-        instructions: 'Take after food.',
-      },
-    ],
-    clinicalAdvice: {
-      dietRecommendations: ['Stay hydrated'],
-      lifestyleRecommendations: ['Reduce screen time', 'Adequate sleep'],
-      followUpSuggestions: ['Follow up if headaches are recurrent or severe'],
-      suggestedLabTests: [],
-    },
-  },
-  {
-    keywords: ['stomach', 'abdominal', 'nausea', 'vomit', 'diarrhea', 'loose motion'],
-    probableDiagnoses: [{ diagnosis: 'Acute gastroenteritis', confidence: 0.55 }],
-    medicineSuggestions: [
-      {
-        brandName: 'ORS',
-        genericName: 'Oral Rehydration Salts',
-        composition: 'Electrolyte mixture',
-        dosage: '1 sachet in 1L water',
-        frequency: 'Sip throughout the day',
-        durationDays: 3,
-        instructions: 'Continue normal feeding. Avoid oily/spicy food.',
-      },
-    ],
-    clinicalAdvice: {
-      dietRecommendations: ['Bland diet (BRAT: banana, rice, applesauce, toast)', 'Avoid dairy and oily food'],
-      lifestyleRecommendations: ['Rest', 'Maintain hand hygiene'],
-      followUpSuggestions: ['Seek care urgently if signs of dehydration appear'],
-      suggestedLabTests: ['Stool routine examination if symptoms persist'],
-    },
-  },
-];
-
-const DEFAULT_SUGGESTION = {
-  probableDiagnoses: [
-    { diagnosis: 'Nonspecific presentation — clinical correlation advised', confidence: 0.3 },
-  ],
-  medicineSuggestions: [],
-  clinicalAdvice: {
-    dietRecommendations: ['Maintain adequate hydration'],
-    lifestyleRecommendations: ['Adequate rest'],
-    followUpSuggestions: ['Doctor to assess further based on examination'],
-    suggestedLabTests: [],
-  },
-};
-
 /**
  * Simulates an LLM call: matches the patient's symptom text against
- * a small knowledge base and returns a structured suggestion object.
+ * the knowledge base and returns a structured suggestion object.
  * Always resolves (never throws), so the UI never sees a 429 or
  * network failure — this mirrors a real implementation's shape exactly.
  */

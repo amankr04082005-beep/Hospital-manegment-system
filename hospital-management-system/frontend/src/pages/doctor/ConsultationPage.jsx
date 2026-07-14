@@ -6,6 +6,7 @@ import * as prescriptionService from '../../services/prescription.service';
 import * as emrService from '../../services/emr.service';
 import * as prescriptionHistoryService from '../../services/prescription.service';
 import * as medicineService from '../../services/medicine.service';
+import * as appointmentService from '../../services/appointment.service';
 import toast from 'react-hot-toast';
 import './ConsultationPage.css';
 
@@ -197,9 +198,31 @@ function MedicineRow({ medicine, index, isApproved, onUpdate, onRemove }) {
 export default function ConsultationPage() {
   const [params] = useSearchParams();
   const appointmentId = params.get('appointmentId') || '';
-  const patientId = params.get('patientId') || '';
+  const rawPatientId = params.get('patientId');
+  const initialPatientId = rawPatientId && rawPatientId !== 'undefined' && rawPatientId !== 'null' ? rawPatientId : '';
+
+  const [patientId, setPatientId] = useState(initialPatientId);
 
   const [symptoms, setSymptoms] = useState('');
+
+  // Pre-fill symptoms from the appointment's booking-time symptoms so the
+  // doctor doesn't have to retype what the patient already entered, and so
+  // the AI suggestion is generated from the patient's actual complaint.
+  useEffect(() => {
+    async function prefillSymptomsFromAppointment() {
+      if (!appointmentId) return;
+      try {
+        const appt = await appointmentService.getAppointmentById(appointmentId);
+        if (appt && appt.symptoms) {
+          setSymptoms(appt.symptoms);
+        }
+      } catch (err) {
+        // silently ignore — doctor can still type symptoms manually
+      }
+    }
+    prefillSymptomsFromAppointment();
+  }, [appointmentId]);
+
   const [prescription, setPrescription] = useState(null);
   const [finalMedicines, setFinalMedicines] = useState([]);
   const [diagnosis, setDiagnosis] = useState('');
@@ -240,8 +263,26 @@ export default function ConsultationPage() {
   useEffect(() => {
     async function loadHistory() {
       if (!patientId) {
-        setEmrLoading(false);
-        return;
+        // If patientId is missing but appointmentId exists, fetch appointment and derive patient
+        if (appointmentId) {
+          try {
+            const appt = await appointmentService.getAppointmentById(appointmentId);
+            if (appt && appt.patient && appt.patient._id) {
+              setPatientId(appt.patient._id);
+              // continue to load history using the newly set patientId
+            } else {
+              setEmrLoading(false);
+              return;
+            }
+          } catch (err) {
+            toast.error(err.response?.data?.message || 'Could not load appointment details.');
+            setEmrLoading(false);
+            return;
+          }
+        } else {
+          setEmrLoading(false);
+          return;
+        }
       }
       try {
         const data = await emrService.getPatientHistory(patientId);
@@ -365,6 +406,8 @@ export default function ConsultationPage() {
       setFinalMedicines(
         (draft.aiRecommendation?.medicineSuggestions || []).map((m) => ({ ...m, source: 'ai_suggested' }))
       );
+      setDietAdvice((draft.aiRecommendation?.clinicalAdvice?.dietRecommendations || []).join(', '));
+      setFollowUpInstructions((draft.aiRecommendation?.clinicalAdvice?.followUpSuggestions || []).join(', '));
       toast.success('AI clinical suggestions generated. Review before approving.');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Could not generate AI suggestion.');

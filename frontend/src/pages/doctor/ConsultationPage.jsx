@@ -204,6 +204,21 @@ export default function ConsultationPage() {
   const [patientId, setPatientId] = useState(initialPatientId);
 
   const [symptoms, setSymptoms] = useState('');
+
+  useEffect(() => {
+    async function prefillSymptomsFromAppointment() {
+      if (!appointmentId) return;
+      try {
+        const appt = await appointmentService.getAppointmentById(appointmentId);
+        if (appt && appt.symptoms) {
+          setSymptoms(appt.symptoms);
+        }
+      } catch (err) {
+        // silently ignore
+      }
+    }
+    prefillSymptomsFromAppointment();
+  }, [appointmentId]);
   const [prescription, setPrescription] = useState(null);
   const [finalMedicines, setFinalMedicines] = useState([]);
   const [diagnosis, setDiagnosis] = useState('');
@@ -387,6 +402,8 @@ export default function ConsultationPage() {
       setFinalMedicines(
         (draft.aiRecommendation?.medicineSuggestions || []).map((m) => ({ ...m, source: 'ai_suggested' }))
       );
+      setDietAdvice((draft.aiRecommendation?.clinicalAdvice?.dietRecommendations || []).join(', '));
+      setFollowUpInstructions((draft.aiRecommendation?.clinicalAdvice?.followUpSuggestions || []).join(', '));
       toast.success('AI clinical suggestions generated. Review before approving.');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Could not generate AI suggestion.');
