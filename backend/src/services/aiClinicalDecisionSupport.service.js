@@ -145,13 +145,21 @@ async function generateClinicalRecommendation({
   existingDiseases = [],
   currentMedications = [],
   labReports = [],
+  medicineSystem,
 }) {
   const aiOutput = await callLanguageModel({ symptoms });
 
-  const medicineSuggestions = (aiOutput.medicineSuggestions || []).map((m) => ({
+  let medicineSuggestions = (aiOutput.medicineSuggestions || []).map((m) => ({
     ...m,
     source: 'ai_suggested',
   }));
+  if (medicineSystem === 'Homeopathy') {
+    medicineSuggestions = medicineSuggestions.filter((m) => (m.brandName || '').includes('(Homeopathic)'));
+  } else if (medicineSystem === 'Ayurveda') {
+    medicineSuggestions = medicineSuggestions.filter((m) => (m.brandName || '').includes('(Ayurvedic)'));
+  } else {
+    medicineSuggestions = medicineSuggestions.filter((m) => !(m.brandName || '').includes('(Homeopathic)') && !(m.brandName || '').includes('(Ayurvedic)'));
+  }
 
   const [allergyAlerts, contraindicationAlerts, interactionWarnings] = await Promise.all([
     checkAllergyAlerts(allergies, medicineSuggestions),

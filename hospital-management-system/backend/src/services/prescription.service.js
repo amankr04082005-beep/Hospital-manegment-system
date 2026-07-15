@@ -59,7 +59,7 @@ async function createDraftWithAiSuggestion({ appointmentId, patientId, doctorId,
 
   const patient = await Patient.findById(patientId);
   if (!patient) throw new Error('Patient not found');
-
+const doctor = await Doctor.findById(doctorId);
 
   const aiRecommendation = await aiService.generateClinicalRecommendation({
     symptoms,
