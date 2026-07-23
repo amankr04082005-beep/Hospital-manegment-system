@@ -125,7 +125,7 @@ async function seed() {
     familyHistory: { diabetes: true, hypertension: false, heartDisease: false },
   });
 
-  // SRS Module 6 example data: Dolo 650 / Crocin 650 / Calpol 650
+  // SRS Module 6 example data: Dolo 650 / Crocin 650 / Calpol 650 + expanded catalogue
   await Medicine.insertMany([
     {
       brandName: 'Dolo 650',
@@ -167,6 +167,202 @@ async function seed() {
       isPenicillinBased: true,
       contraindications: ['kidney_disease'],
       interactsWith: [{ composition: 'Warfarin', severity: 'moderate', note: 'May increase bleeding risk' }],
+    },
+
+    // Paracetamol 500mg group
+    {
+      brandName: 'Dolo 500',
+      genericName: 'Paracetamol',
+      composition: 'Paracetamol 500mg',
+      manufacturer: 'Micro Labs',
+      form: 'tablet',
+      category: 'Analgesic/Antipyretic',
+      isPenicillinBased: false,
+      contraindications: ['liver_disease'],
+    },
+    {
+      brandName: 'Crocin Advance',
+      genericName: 'Paracetamol',
+      composition: 'Paracetamol 500mg',
+      manufacturer: 'GSK',
+      form: 'tablet',
+      category: 'Analgesic/Antipyretic',
+      isPenicillinBased: false,
+      contraindications: ['liver_disease'],
+    },
+
+    // Diphenhydramine group (Benadryl)
+    {
+      brandName: 'Benadryl',
+      genericName: 'Diphenhydramine',
+      composition: 'Diphenhydramine Hydrochloride 12.5mg/5ml',
+      manufacturer: 'Johnson & Johnson',
+      form: 'syrup',
+      category: 'Antihistamine',
+      isPenicillinBased: false,
+      contraindications: ['glaucoma'],
+    },
+    {
+      brandName: 'Phenadryl',
+      genericName: 'Diphenhydramine',
+      composition: 'Diphenhydramine Hydrochloride 12.5mg/5ml',
+      manufacturer: 'Cipla',
+      form: 'syrup',
+      category: 'Antihistamine',
+      isPenicillinBased: false,
+      contraindications: ['glaucoma'],
+    },
+
+    // Cetirizine group
+    {
+      brandName: 'Cetzine',
+      genericName: 'Cetirizine',
+      composition: 'Cetirizine Hydrochloride 10mg',
+      manufacturer: 'GSK',
+      form: 'tablet',
+      category: 'Antihistamine',
+      isPenicillinBased: false,
+      contraindications: [],
+    },
+    {
+      brandName: 'Alerid',
+      genericName: 'Cetirizine',
+      composition: 'Cetirizine Hydrochloride 10mg',
+      manufacturer: 'Cipla',
+      form: 'tablet',
+      category: 'Antihistamine',
+      isPenicillinBased: false,
+      contraindications: [],
+    },
+    {
+      brandName: 'Okacet',
+      genericName: 'Cetirizine',
+      composition: 'Cetirizine Hydrochloride 10mg',
+      manufacturer: 'Cipla',
+      form: 'tablet',
+      category: 'Antihistamine',
+      isPenicillinBased: false,
+      contraindications: [],
+    },
+
+    // Amoxicillin (plain) group
+    {
+      brandName: 'Amoxil',
+      genericName: 'Amoxicillin',
+      composition: 'Amoxicillin 500mg',
+      manufacturer: 'GSK',
+      form: 'capsule',
+      category: 'Antibiotic',
+      isPenicillinBased: true,
+      contraindications: ['penicillin_allergy'],
+    },
+    {
+      brandName: 'Novamox',
+      genericName: 'Amoxicillin',
+      composition: 'Amoxicillin 500mg',
+      manufacturer: 'Cipla',
+      form: 'capsule',
+      category: 'Antibiotic',
+      isPenicillinBased: true,
+      contraindications: ['penicillin_allergy'],
+    },
+    {
+      brandName: 'Mox',
+      genericName: 'Amoxicillin',
+      composition: 'Amoxicillin 500mg',
+      manufacturer: 'Ranbaxy',
+      form: 'capsule',
+      category: 'Antibiotic',
+      isPenicillinBased: true,
+      contraindications: ['penicillin_allergy'],
+    },
+
+    // Azithromycin group
+    {
+      brandName: 'Azithral 500',
+      genericName: 'Azithromycin',
+      composition: 'Azithromycin 500mg',
+      manufacturer: 'Alembic',
+      form: 'tablet',
+      category: 'Antibiotic',
+      isPenicillinBased: false,
+      contraindications: ['liver_disease'],
+    },
+    {
+      brandName: 'Zithromax',
+      genericName: 'Azithromycin',
+      composition: 'Azithromycin 500mg',
+      manufacturer: 'Pfizer',
+      form: 'tablet',
+      category: 'Antibiotic',
+      isPenicillinBased: false,
+      contraindications: ['liver_disease'],
+    },
+
+    // Ibuprofen group
+    {
+      brandName: 'Brufen 400',
+      genericName: 'Ibuprofen',
+      composition: 'Ibuprofen 400mg',
+      manufacturer: 'Abbott',
+      form: 'tablet',
+      category: 'NSAID',
+      isPenicillinBased: false,
+      contraindications: ['kidney_disease', 'peptic_ulcer'],
+    },
+    {
+      brandName: 'Combiflam',
+      genericName: 'Ibuprofen + Paracetamol',
+      composition: 'Ibuprofen 400mg + Paracetamol 325mg',
+      manufacturer: 'Sanofi',
+      form: 'tablet',
+      category: 'NSAID/Analgesic',
+      isPenicillinBased: false,
+      contraindications: ['kidney_disease', 'peptic_ulcer', 'liver_disease'],
+    },
+
+    // Omeprazole group
+    {
+      brandName: 'Omez',
+      genericName: 'Omeprazole',
+      composition: 'Omeprazole 20mg',
+      manufacturer: "Dr. Reddy's",
+      form: 'capsule',
+      category: 'Proton Pump Inhibitor',
+      isPenicillinBased: false,
+      contraindications: [],
+    },
+    {
+      brandName: 'Prilosec',
+      genericName: 'Omeprazole',
+      composition: 'Omeprazole 20mg',
+      manufacturer: 'AstraZeneca',
+      form: 'capsule',
+      category: 'Proton Pump Inhibitor',
+      isPenicillinBased: false,
+      contraindications: [],
+    },
+
+    // Metformin group
+    {
+      brandName: 'Glycomet 500',
+      genericName: 'Metformin',
+      composition: 'Metformin Hydrochloride 500mg',
+      manufacturer: 'USV',
+      form: 'tablet',
+      category: 'Antidiabetic',
+      isPenicillinBased: false,
+      contraindications: ['kidney_disease'],
+    },
+    {
+      brandName: 'Glucophage',
+      genericName: 'Metformin',
+      composition: 'Metformin Hydrochloride 500mg',
+      manufacturer: 'Merck',
+      form: 'tablet',
+      category: 'Antidiabetic',
+      isPenicillinBased: false,
+      contraindications: ['kidney_disease'],
     },
   ]);
 
