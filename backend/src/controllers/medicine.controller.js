@@ -50,7 +50,7 @@ async function lookupBatch(req, res, next) {
   }
 }
 
-// GET /api/medicines/:id/alternatives — same composition, different brand
+// GET /api/medicines/:id/alternatives — same composition, different brand (local only)
 async function getAlternatives(req, res, next) {
   try {
     const medicine = await Medicine.findById(req.params.id);
@@ -61,30 +61,76 @@ async function getAlternatives(req, res, next) {
       _id: { $ne: medicine._id },
     });
 
-    if (localAlternatives.length > 0) {
-      return res.json({ success: true, data: localAlternatives, source: 'local' });
+    res.json({ success: true, data: localAlternatives, source: 'local' });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// GET /api/medicines/alternatives-by-name?name=Aspirin
+// Works even when the medicine is NOT in the local catalogue:
+//  1. If a local match exists, return local same-composition alternatives.
+//  2. If no local match, fall back to the external Drug Database API
+//     using the name directly as the substance/generic name.
+async function getAlternativesByName(req, res, next) {
+  try {
+    const { name } = req.query;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ success: false, message: 'name query param is required.' });
     }
 
-    const externalDrugs = await findAlternativesFromDrugDatabase(
-      medicine.genericName || medicine.brandName
-    );
+    const trimmed = name.trim();
 
-    const formattedExternal = externalDrugs
+    // Step 1: try to resolve to a local catalogue entry
+    const localMatch = await Medicine.findOne({
+      $or: [
+        { brandName: new RegExp(`^${trimmed}$`, 'i') },
+        { genericName: new RegExp(`^${trimmed}$`, 'i') },
+      ],
+    });
+
+    if (localMatch) {
+      const localAlternatives = await Medicine.find({
+        composition: localMatch.composition,
+        _id: { $ne: localMatch._id },
+      });
+
+      if (localAlternatives.length > 0) {
+        return res.json({ success: true, data: localAlternatives, source: 'local' });
+      }
+      const externalDrugs = await findAlternativesFromDrugDatabase(localMatch.genericName || trimmed);
+      const formatted = externalDrugs
+        .filter((d) => d.product_name)
+        .map((d) => ({
+          brandName: d.product_name,
+          genericName: localMatch.genericName,
+          composition: localMatch.composition,
+          manufacturer: d.manufacturer || null,
+          countryCode: d.country_code || null,
+          source: 'drug_database_api',
+        }));
+      return res.json({ success: true, data: formatted, source: 'external' });
+    }
+
+    // Step 2: no local match at all — go straight to external
+    const externalDrugs = await findAlternativesFromDrugDatabase(trimmed);
+    const formatted = externalDrugs
       .filter((d) => d.product_name)
       .map((d) => ({
         brandName: d.product_name,
-        genericName: medicine.genericName,
-        composition: medicine.composition,
+        genericName: trimmed,
+        composition: null,
         manufacturer: d.manufacturer || null,
         countryCode: d.country_code || null,
         source: 'drug_database_api',
       }));
 
-    res.json({ success: true, data: formattedExternal, source: 'external' });
+    res.json({ success: true, data: formatted, source: 'external' });
   } catch (error) {
     next(error);
   }
 }
+
 
 // GET /api/medicines/inventory
 async function getInventory(req, res, next) {
@@ -120,4 +166,12 @@ async function updateStock(req, res, next) {
   }
 }
 
-module.exports = { search, lookupExternal, lookupBatch, getAlternatives, getInventory, updateStock };
+module.exports = {
+  search,
+  lookupExternal,
+  lookupBatch,
+  getAlternatives,
+  getAlternativesByName,
+  getInventory,
+  updateStock,
+};
