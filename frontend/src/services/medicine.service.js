@@ -12,16 +12,15 @@ export async function getAlternatives(medicineId) {
   return data.data;
 }
 
+// Now backed by a single dedicated endpoint that works even when the
+// medicine isn't in the local catalogue (falls back to external Drug
+// Database API on the backend).
 export async function getAlternativesByName(name) {
   if (!name || !name.trim()) return { resolvedId: null, alternatives: [] };
-  const matches = await searchMedicines(name.trim());
-  if (!matches || matches.length === 0) return { resolvedId: null, alternatives: [] };
-
-  const exact = matches.find((m) => m.brandName?.toLowerCase() === name.trim().toLowerCase());
-  const resolved = exact || matches[0];
-
-  const alternatives = await getAlternatives(resolved._id);
-  return { resolvedId: resolved._id, alternatives: alternatives.filter((a) => a._id !== resolved._id) };
+  const { data } = await api.get('/medicines/alternatives-by-name', {
+    params: { name: name.trim() },
+  });
+  return { resolvedId: null, alternatives: data.data || [], source: data.source };
 }
 
 // SRS Module 2.4 — Pharmacist permission: Manage Inventory.

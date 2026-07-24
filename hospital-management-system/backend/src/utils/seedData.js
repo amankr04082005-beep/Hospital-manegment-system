@@ -366,6 +366,8 @@ async function seed() {
     },
   ]);
 
+  const countAfterInsert = await Medicine.countDocuments();
+  console.log('Medicines inserted, total now:', countAfterInsert);
   console.log('Seed complete.');
   console.log('Demo logins:');
   console.log('  Admin:        admin@hospital.com / Admin@1234');
@@ -383,3 +385,4 @@ seed().catch((err) => {
   console.error('Seed failed:', err);
   process.exit(1);
 });
+console.log('TEST LINE CHECK 123');

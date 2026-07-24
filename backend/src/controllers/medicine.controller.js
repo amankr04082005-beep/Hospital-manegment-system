@@ -1,5 +1,6 @@
 const Medicine = require('../models/Medicine');
-const drugDatabaseService = require('../services/drugDatabase.service');
+const { findAlternativesFromDrugDatabase, lookupDrug, lookupMultipleDrugs } = require('../services/drugDatabase.service');
+
 
 // GET /api/medicines/search?q=Dolo  — Module 6: Search by brand/generic/composition
 async function search(req, res, next) {
@@ -21,65 +22,71 @@ async function search(req, res, next) {
   }
 }
 
-// GET /api/medicines/:id/alternatives — same composition, different brand
-async function getAlternatives(req, res, next) {
-  try {
-    const medicine = await Medicine.findById(req.params.id);
-    if (!medicine) return res.status(404).json({ success: false, message: 'Medicine not found.' });
-
-    const alternatives = await Medicine.find({
-      composition: medicine.composition,
-      _id: { $ne: medicine._id },
-    });
-
-    res.json({ success: true, data: alternatives });
-  } catch (error) {
-    next(error);
-  }
-}
-
-// GET /api/medicines/lookup?name=Paracetamol
+// GET /api/medicines/lookup?name=Ibuprofen — external lookup (local -> OpenFDA -> RxNorm)
 async function lookupExternal(req, res, next) {
   try {
     const { name } = req.query;
-    if (!name || !name.trim()) {
-      return res.status(400).json({ success: false, message: 'Query param "name" is required.' });
-    }
+    if (!name) return res.status(400).json({ success: false, message: 'name query param is required.' });
 
-    const result = await drugDatabaseService.lookupDrug(name.trim());
-
-    if (!result.found) {
-      return res.status(404).json({
-        success: false,
-        message: `No drug information found for "${name}" in local database or OpenFDA.`,
-      });
-    }
-
-    res.json({ success: true, source: result.source, data: result.data });
+    const result = await lookupDrug(name);
+    res.json({ success: true, ...result });
   } catch (error) {
     next(error);
   }
 }
 
-// POST /api/medicines/lookup-batch  { drugNames: ["Paracetamol", "Amoxicillin"] }
+// POST /api/medicines/lookup-batch  Body: { names: ["Ibuprofen", "Paracetamol"] }
 async function lookupBatch(req, res, next) {
   try {
-    const { drugNames } = req.body;
-    if (!Array.isArray(drugNames) || drugNames.length === 0) {
-      return res.status(400).json({ success: false, message: '"drugNames" must be a non-empty array.' });
+    const { names } = req.body;
+    if (!Array.isArray(names) || names.length === 0) {
+      return res.status(400).json({ success: false, message: 'names must be a non-empty array.' });
     }
 
-    const results = await drugDatabaseService.lookupMultipleDrugs(drugNames);
+    const results = await lookupMultipleDrugs(names);
     res.json({ success: true, data: results });
   } catch (error) {
     next(error);
   }
 }
 
+// GET /api/medicines/:id/alternatives — same composition, different brand
+async function getAlternatives(req, res, next) {
+  try {
+    const medicine = await Medicine.findById(req.params.id);
+    if (!medicine) return res.status(404).json({ success: false, message: 'Medicine not found.' });
+
+    const localAlternatives = await Medicine.find({
+      composition: medicine.composition,
+      _id: { $ne: medicine._id },
+    });
+
+    if (localAlternatives.length > 0) {
+      return res.json({ success: true, data: localAlternatives, source: 'local' });
+    }
+
+    const externalDrugs = await findAlternativesFromDrugDatabase(
+      medicine.genericName || medicine.brandName
+    );
+
+    const formattedExternal = externalDrugs
+      .filter((d) => d.product_name)
+      .map((d) => ({
+        brandName: d.product_name,
+        genericName: medicine.genericName,
+        composition: medicine.composition,
+        manufacturer: d.manufacturer || null,
+        countryCode: d.country_code || null,
+        source: 'drug_database_api',
+      }));
+
+    res.json({ success: true, data: formattedExternal, source: 'external' });
+  } catch (error) {
+    next(error);
+  }
+}
+
 // GET /api/medicines/inventory
-// SRS Module 2.4 — Pharmacist permission: Manage Inventory.
-// Lists every medicine with its current stock, sorted low-stock-first
-// so the pharmacist immediately sees what needs reordering.
 async function getInventory(req, res, next) {
   try {
     const medicines = await Medicine.find().sort({ stockQuantity: 1, brandName: 1 });
@@ -90,8 +97,6 @@ async function getInventory(req, res, next) {
 }
 
 // PATCH /api/medicines/:id/stock  (Pharmacist only)
-// Body: { adjustment: number, reason?: string }  — positive to restock,
-// negative to record dispensing/wastage. Never goes below zero.
 async function updateStock(req, res, next) {
   try {
     if (req.user.role !== 'pharmacist' && req.user.role !== 'admin') {
@@ -115,4 +120,4 @@ async function updateStock(req, res, next) {
   }
 }
 
-module.exports = { search, getAlternatives, lookupExternal, lookupBatch, getInventory, updateStock };
+module.exports = { search, lookupExternal, lookupBatch, getAlternatives, getInventory, updateStock };
