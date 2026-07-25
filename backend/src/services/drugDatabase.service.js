@@ -1,405 +1,207 @@
+const axios = require('axios');
 const Medicine = require('../models/Medicine');
 
 /**
- * SRS Module 5 — Step 2 & 3: AI Analysis + AI Recommendations.
+ * SRS Module 6 — Drug Database Integration.
  *
- * This service ONLY produces a recommendation object. It never writes
- * directly to a Prescription as "final" content, and it never marks a
- * prescription as approved. That gate is enforced exclusively in
- * prescriptionService.approvePrescription() by a doctor.
+ * Strategy:
+ *  1. Look up the medicine in our local `Medicine` collection first
+ *     (fast, curated, used for contraindication/interaction checks).
+ *  2. If not found locally, fall back to the free, public OpenFDA
+ *     Drug Label API (https://open.fda.gov/apis/drug/label/) which
+ *     requires NO API key and NO signup.
+ *  3. For "same composition" alternatives specifically, fall back to
+ *     the Drug Database API (drug-database.com) using:
+ *       substance name -> xref (UNII + codes) -> ATC code -> drugs in
+ *       that ATC subtree.
+ *     NOTE: /v1/substances/{unii} on this provider returns 404 even
+ *     for valid UNIIs (provider-side data gap), so we deliberately do
+ *     NOT call it. Instead we extract the ATC code directly from the
+ *     /v1/substances/xref response's `codes` array.
  *
- * NOTE: This version uses a built-in MOCK/simulated AI engine instead of
- * calling an external LLM (OpenAI/Gemini/etc). This avoids API costs,
- * quota limits (HTTP 429), and network dependency — useful for demos,
- * grading, and offline development. The output shape is identical to
- * what a real LLM-backed implementation would return, so this can be
- * swapped for a real API call later without touching any other file.
+ * OpenFDA / RxNorm / Drug Database are informational only and
+ * should never be treated as a substitute for clinical judgement.
  */
 
-const AI_LABEL = 'AI Suggested - Pending Doctor Approval'; // Rule 1
+const OPENFDA_BASE_URL = 'https://api.fda.gov/drug/label.json';
 
-// External AI providers (e.g., Gemini)
-// Strategy: Gemini-first, with safe fallback to MOCK on missing key / failures.
-const AI_ENGINE = process.env.AI_ENGINE || 'gemini';
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || null;
+const RXNORM_BASE_URL = 'https://rxnav.nlm.nih.gov/';
 
+const DRUG_DB_BASE_URL = process.env.DRUG_DATABASE_API_URL || 'https://drug-database.com';
+const DRUG_DB_API_KEY = process.env.DRUG_DATABASE_API_KEY || null;
 
-// Simple keyword -> clinical suggestion knowledge base.
-// Each entry mimics what an LLM might return for that symptom pattern.
-const SYMPTOM_KNOWLEDGE_BASE = [
-  {
-    keywords: ['fever', 'temperature', 'chills'],
-    probableDiagnoses: [
-      { diagnosis: 'Viral fever', confidence: 0.7 },
-      { diagnosis: 'Common cold / Upper respiratory infection', confidence: 0.5 },
-    ],
-    medicineSuggestions: [
-      {
-        brandName: 'Dolo 650',
-        genericName: 'Paracetamol',
-        composition: 'Paracetamol 650mg',
-        dosage: '1 tablet',
-        frequency: 'Every 6-8 hours as needed',
-        durationDays: 3,
-        instructions: 'Take after food. Do not exceed 4 tablets in 24 hours.',
-      },
-    ],
-    clinicalAdvice: {
-      dietRecommendations: ['Drink plenty of fluids', 'Light, easily digestible meals'],
-      lifestyleRecommendations: ['Adequate rest', 'Avoid strenuous activity'],
-      followUpSuggestions: ['Follow up if fever persists beyond 3 days'],
-      suggestedLabTests: ['CBC if fever persists beyond 3 days'],
-    },
-  },
-  {
-    keywords: ['cough', 'cold', 'sore throat', 'throat pain'],
-    probableDiagnoses: [
-      { diagnosis: 'Acute upper respiratory tract infection', confidence: 0.65 },
-    ],
-    medicineSuggestions: [
-      {
-        brandName: 'Benadryl',
-        genericName: 'Diphenhydramine',
-        composition: 'Diphenhydramine 12.5mg',
-        dosage: '10ml',
-        frequency: 'Twice daily',
-        durationDays: 5,
-        instructions: 'Take after food. May cause drowsiness.',
-      },
-    ],
-    clinicalAdvice: {
-      dietRecommendations: ['Warm fluids', 'Avoid cold drinks/ice cream'],
-      lifestyleRecommendations: ['Steam inhalation', 'Gargle with warm salt water'],
-      followUpSuggestions: ['Follow up if symptoms persist beyond 5-7 days'],
-      suggestedLabTests: [],
-    },
-  },
-  {
-    keywords: ['headache', 'migraine'],
-    probableDiagnoses: [{ diagnosis: 'Tension headache', confidence: 0.6 }],
-    medicineSuggestions: [
-      {
-        brandName: 'Crocin',
-        genericName: 'Paracetamol',
-        composition: 'Paracetamol 500mg',
-        dosage: '1 tablet',
-        frequency: 'Every 8 hours as needed',
-        durationDays: 2,
-        instructions: 'Take after food.',
-      },
-    ],
-    clinicalAdvice: {
-      dietRecommendations: ['Stay hydrated'],
-      lifestyleRecommendations: ['Reduce screen time', 'Adequate sleep'],
-      followUpSuggestions: ['Follow up if headaches are recurrent or severe'],
-      suggestedLabTests: [],
-    },
-  },
-  {
-    keywords: ['stomach', 'abdominal', 'nausea', 'vomit', 'diarrhea', 'loose motion'],
-    probableDiagnoses: [{ diagnosis: 'Acute gastroenteritis', confidence: 0.55 }],
-    medicineSuggestions: [
-      {
-        brandName: 'ORS',
-        genericName: 'Oral Rehydration Salts',
-        composition: 'Electrolyte mixture',
-        dosage: '1 sachet in 1L water',
-        frequency: 'Sip throughout the day',
-        durationDays: 3,
-        instructions: 'Continue normal feeding. Avoid oily/spicy food.',
-      },
-    ],
-    clinicalAdvice: {
-      dietRecommendations: ['Bland diet (BRAT: banana, rice, applesauce, toast)', 'Avoid dairy and oily food'],
-      lifestyleRecommendations: ['Rest', 'Maintain hand hygiene'],
-      followUpSuggestions: ['Seek care urgently if signs of dehydration appear'],
-      suggestedLabTests: ['Stool routine examination if symptoms persist'],
-    },
-  },
-  {
-    keywords: ['malaria', 'suspected malaria'],
-    probableDiagnoses: [
-      { diagnosis: 'Malaria — suspected, needs testing', confidence: 0.4 },
-    ],
-    medicineSuggestions: [
-      {
-        brandName: 'Dolo 650',
-        genericName: 'Paracetamol',
-        composition: 'Paracetamol 650mg',
-        dosage: '1 tablet',
-        frequency: 'Every 6-8 hours as needed for fever',
-        durationDays: 2,
-        instructions: 'For symptomatic fever relief only, while awaiting confirmatory testing. Do not substitute for antimalarial treatment once diagnosis is confirmed.',
-      },
-    ],
-    clinicalAdvice: {
-      dietRecommendations: ['Plenty of fluids'],
-      lifestyleRecommendations: ['Rest', 'Avoid exertion until diagnosis is confirmed'],
-      followUpSuggestions: ['Refer urgently for peripheral smear/rapid test — treatment depends on species identification'],
-      suggestedLabTests: ['Peripheral blood smear', 'Rapid malaria antigen test'],
-    },
-  },
-];
+function safeEncode(q) {
+  return encodeURIComponent(q || '');
+}
 
-const DEFAULT_SUGGESTION = {
-  probableDiagnoses: [
-    { diagnosis: 'Nonspecific presentation — clinical correlation advised', confidence: 0.3 },
-  ],
-  medicineSuggestions: [],
-  clinicalAdvice: {
-    dietRecommendations: ['Maintain adequate hydration'],
-    lifestyleRecommendations: ['Adequate rest'],
-    followUpSuggestions: ['Doctor to assess further based on examination'],
-    suggestedLabTests: [],
-  },
-};
+async function fetchFromRxNormByName(drugName) {
+  if (!drugName) return null;
 
-/**
- * Simulates an LLM call: matches the patient's symptom text against
- * a small knowledge base and returns a structured suggestion object.
- * Always resolves (never throws), so the UI never sees a 429 or
- * network failure — this mirrors a real implementation's shape exactly.
- */
-async function callLanguageModel({ symptoms = '' }) {
-  const runMock = async () => {
-    await new Promise((resolve) => setTimeout(resolve, 400));
+  try {
+    const { data } = await axios.get(`${RXNORM_BASE_URL}REST/rxcui.json?name=${safeEncode(drugName)}`, {
+      timeout: 10000,
+    });
 
-    const lowerSymptoms = symptoms.toLowerCase();
-    const matches = SYMPTOM_KNOWLEDGE_BASE.filter((entry) =>
-      entry.keywords.some((kw) => lowerSymptoms.includes(kw))
+    const rxcuis = data?.idGroup?.rxnormId || [];
+    if (!rxcuis.length) return null;
+
+    const rxcui = Array.isArray(rxcuis) ? rxcuis[0] : null;
+    if (!rxcui) return null;
+
+    const nameResp = await axios.get(
+      `${RXNORM_BASE_URL}REST/clinDrugName.json?rxcui=${safeEncode(rxcui)}`,
+      { timeout: 10000 }
     );
 
-    if (matches.length === 0) {
-      return DEFAULT_SUGGESTION;
-    }
+    const names = nameResp?.data?.names || nameResp?.data?.nameGroup?.name || [];
 
-    const merged = matches.reduce(
-      (acc, entry) => ({
-        probableDiagnoses: [...acc.probableDiagnoses, ...entry.probableDiagnoses],
-        medicineSuggestions: [...acc.medicineSuggestions, ...entry.medicineSuggestions],
-        clinicalAdvice: {
-          dietRecommendations: [
-            ...acc.clinicalAdvice.dietRecommendations,
-            ...entry.clinicalAdvice.dietRecommendations,
-          ],
-          lifestyleRecommendations: [
-            ...acc.clinicalAdvice.lifestyleRecommendations,
-            ...entry.clinicalAdvice.lifestyleRecommendations,
-          ],
-          followUpSuggestions: [
-            ...acc.clinicalAdvice.followUpSuggestions,
-            ...entry.clinicalAdvice.followUpSuggestions,
-          ],
-          suggestedLabTests: [
-            ...acc.clinicalAdvice.suggestedLabTests,
-            ...entry.clinicalAdvice.suggestedLabTests,
-          ],
-        },
-      }),
-      {
-        probableDiagnoses: [],
-        medicineSuggestions: [],
-        clinicalAdvice: {
-          dietRecommendations: [],
-          lifestyleRecommendations: [],
-          followUpSuggestions: [],
-          suggestedLabTests: [],
-        },
-      }
-    );
-
-    merged.clinicalAdvice.dietRecommendations = [
-      ...new Set(merged.clinicalAdvice.dietRecommendations),
-    ];
-    merged.clinicalAdvice.lifestyleRecommendations = [
-      ...new Set(merged.clinicalAdvice.lifestyleRecommendations),
-    ];
-    merged.clinicalAdvice.followUpSuggestions = [
-      ...new Set(merged.clinicalAdvice.followUpSuggestions),
-    ];
-    merged.clinicalAdvice.suggestedLabTests = [
-      ...new Set(merged.clinicalAdvice.suggestedLabTests),
-    ];
-
-    return merged;
-  };
-
-  // Gemini-first strategy
-  if (AI_ENGINE === 'gemini' && GEMINI_API_KEY) {
-    try {
-      const axios = require('axios');
-
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-
-      const prompt = `You are a clinical decision support assistant for doctors.
-Return ONLY valid JSON matching this schema:
-{
-  "probableDiagnoses": [{"diagnosis": string, "confidence": number}],
-  "medicineSuggestions": [{"brandName": string, "genericName": string, "composition": string, "dosage": string, "frequency": string, "durationDays": number, "instructions": string}],
-  "clinicalAdvice": {
-     "dietRecommendations": [string],
-     "lifestyleRecommendations": [string],
-     "followUpSuggestions": [string],
-     "suggestedLabTests": [string]
+    return {
+      source: 'rxnorm',
+      brandName: null,
+      genericName: Array.isArray(names) ? names[0]?.name || null : null,
+      manufacturer: null,
+      composition: null,
+      warnings: null,
+      drugInteractionsText: null,
+      contraindicationsText: null,
+      dosageText: null,
+    };
+  } catch (err) {
+    console.error('RxNorm lookup failed for', drugName, '-', err.response?.status || err.message);
+    return null;
   }
 }
 
-Symptoms: ${symptoms}
+async function fetchFromOpenFDA(drugName) {
+  if (!drugName) return null;
 
-Important: Even in cases that require confirmatory testing before a definitive diagnosis can be made
-(e.g. suspected malaria, suspected dengue, suspected typhoid), still suggest safe, symptomatic
-medicines (e.g. paracetamol for fever, ORS for dehydration) that can reasonably be given while
-awaiting test results — do NOT leave medicineSuggestions empty just because the diagnosis is
-unconfirmed. Do NOT suggest disease-specific definitive treatment (e.g. antimalarials, antibiotics
-targeting a specific unconfirmed pathogen) without a confirmed diagnosis; only suggest symptomatic/
-supportive care in those cases, and note in "instructions" that it is for symptomatic relief pending
-confirmatory testing. Provide safe, general suggestions for doctor review. Do not include anything
-non-JSON.`;
+  const searchAttempts = [
+    `openfda.brand_name:"${drugName}"`,
+    `openfda.generic_name:"${drugName}"`,
+  ];
 
-      const response = await axios.post(
-        url,
-        {
-          contents: [{
-            role: 'user',
-            parts: [{ text: prompt }],
-          }],
-          generationConfig: {
-            temperature: 0.2,
-            maxOutputTokens: 800,
-          },
-        },
-        { timeout: 12000 }
-      );
+  for (const search of searchAttempts) {
+    try {
+      const { data } = await axios.get(OPENFDA_BASE_URL, {
+        params: { search, limit: 1 },
+        timeout: 10000,
+      });
 
-      const text = response?.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!text) return runMock();
-
-      const cleaned = text
-        .trim()
-        .replace(/^```json\s*/i, '')
-        .replace(/^```\s*/i, '')
-        .replace(/```\s*$/i, '');
-
-      const parsed = JSON.parse(cleaned);
+      const result = data?.results?.[0];
+      if (!result) continue;
 
       return {
-        probableDiagnoses: Array.isArray(parsed.probableDiagnoses) ? parsed.probableDiagnoses : [],
-        medicineSuggestions: Array.isArray(parsed.medicineSuggestions) ? parsed.medicineSuggestions : [],
-        clinicalAdvice: parsed.clinicalAdvice || {
-          dietRecommendations: [],
-          lifestyleRecommendations: [],
-          followUpSuggestions: [],
-          suggestedLabTests: [],
-        },
+        source: 'openfda',
+        brandName: result.openfda?.brand_name?.[0] || drugName,
+        genericName: result.openfda?.generic_name?.[0] || null,
+        manufacturer: result.openfda?.manufacturer_name?.[0] || null,
+        composition: result.active_ingredient?.[0]?.slice(0, 500) || null,
+        warnings: result.warnings?.[0]?.slice(0, 1000) || null,
+        drugInteractionsText: result.drug_interactions?.[0]?.slice(0, 1000) || null,
+        contraindicationsText: result.contraindications?.[0]?.slice(0, 1000) || null,
+        dosageText: result.dosage_and_administration?.[0]?.slice(0, 1000) || null,
       };
     } catch (err) {
-      return runMock();
+      console.error('OpenFDA lookup failed for', search, '-', err.response?.status || err.message);
+      continue;
     }
   }
 
-  return runMock();
+  return null;
 }
 
-async function checkAllergyAlerts(allergies = [], suggestedMedicines = []) {
-  const alerts = [];
-  for (const med of suggestedMedicines) {
-    const catalogMatch = await Medicine.findOne({ composition: new RegExp(med.composition || '', 'i') });
-    if (catalogMatch && catalogMatch.isPenicillinBased && allergies.some((a) => /penicillin/i.test(a))) {
-      alerts.push(`Penicillin based medicine detected: ${med.brandName || med.genericName}`);
-    }
+async function lookupDrug(drugName) {
+  if (!drugName || !drugName.trim()) {
+    return { found: false, source: null, data: null };
   }
-  return alerts;
-}
 
-async function checkContraindications(existingDiseases = [], suggestedMedicines = []) {
-  const alerts = [];
-  const diseaseMap = { 'kidney disease': 'kidney_disease', 'liver disease': 'liver_disease' };
-  const patientFlags = existingDiseases
-    .map((d) => diseaseMap[d.toLowerCase()])
-    .filter(Boolean);
+  const localMatch = await Medicine.findOne({
+    $or: [
+      { brandName: new RegExp(`^${drugName}$`, 'i') },
+      { genericName: new RegExp(`^${drugName}$`, 'i') },
+      { composition: new RegExp(drugName, 'i') },
+    ],
+  }).lean();
 
-  for (const med of suggestedMedicines) {
-    const catalogMatch = await Medicine.findOne({ composition: new RegExp(med.composition || '', 'i') });
-    if (!catalogMatch) continue;
-    const conflicts = catalogMatch.contraindications.filter((c) => patientFlags.includes(c));
-    if (conflicts.length) {
-      alerts.push(
-        `${med.brandName || med.genericName} may be contraindicated due to: ${conflicts.join(', ')}`
-      );
-    }
+  if (localMatch) {
+    return { found: true, source: 'local', data: localMatch };
   }
-  return alerts;
-}
 
-async function checkDrugInteractions(currentMedications = [], suggestedMedicines = []) {
-  const warnings = [];
-  for (const newMed of suggestedMedicines) {
-    const catalogMatch = await Medicine.findOne({ composition: new RegExp(newMed.composition || '', 'i') });
-    if (!catalogMatch || !catalogMatch.interactsWith?.length) continue;
-    for (const existing of currentMedications) {
-      const hit = catalogMatch.interactsWith.find((i) =>
-        new RegExp(i.composition, 'i').test(existing)
-      );
-      if (hit) {
-        warnings.push({
-          severity: hit.severity,
-          description: `${newMed.brandName || newMed.genericName} + ${existing}: ${hit.note}`,
-        });
-      }
-    }
+  const openFDAResult = await fetchFromOpenFDA(drugName);
+  if (openFDAResult) {
+    return { found: true, source: 'openfda', data: openFDAResult };
   }
-  return warnings;
+
+  const rxNormResult = await fetchFromRxNormByName(drugName);
+  if (rxNormResult) {
+    return { found: true, source: 'rxnorm', data: rxNormResult };
+  }
+
+  return { found: false, source: null, data: null };
 }
 
-/**
- * Main entry point: SRS Module 5 Step 1-3.
- * Returns a recommendation object tagged with the compliance label.
- * Caller (prescriptionService) is responsible for persisting this
- * under prescription.aiRecommendation — NEVER under finalMedicines.
- */
-async function generateClinicalRecommendation({
-  symptoms,
-  medicalHistory,
-  allergies = [],
-  existingDiseases = [],
-  currentMedications = [],
-  labReports = [],
-}) {
-  const aiOutput = await callLanguageModel({ symptoms });
+async function lookupMultipleDrugs(drugNames = []) {
+  const results = await Promise.all(
+    drugNames.map(async (name) => ({
+      query: name,
+      ...(await lookupDrug(name)),
+    }))
+  );
+  return results;
+}
 
-  const medicineSuggestions = (aiOutput.medicineSuggestions || []).map((m) => ({
-    ...m,
-    source: 'ai_suggested',
-  }));
+async function resolveSubstanceXref(substanceName) {
+  if (!substanceName || !DRUG_DB_API_KEY) return null;
+  try {
+    const { data } = await axios.get(`${DRUG_DB_BASE_URL}/v1/substances/xref`, {
+      params: { name: substanceName },
+      headers: { Authorization: `Bearer ${DRUG_DB_API_KEY}` },
+      timeout: 10000,
+    });
+    return data || null;
+  } catch (err) {
+    console.error('Drug Database substance xref failed for', substanceName, '-', err.response?.status || err.message);
+    return null;
+  }
+}
 
-  const [allergyAlerts, contraindicationAlerts, interactionWarnings] = await Promise.all([
-    checkAllergyAlerts(allergies, medicineSuggestions),
-    checkContraindications(existingDiseases, medicineSuggestions),
-    checkDrugInteractions(currentMedications, medicineSuggestions),
-  ]);
+function extractAtcCode(xrefData) {
+  const codes = xrefData?.codes || [];
 
-  return {
-    label: AI_LABEL,
-    probableDiagnoses: aiOutput.probableDiagnoses || [],
-    medicineSuggestions,
-    clinicalAdvice: aiOutput.clinicalAdvice || {
-      dietRecommendations: [],
-      lifestyleRecommendations: [],
-      followUpSuggestions: [],
-      suggestedLabTests: [],
-    },
-    interactionWarnings,
-    allergyAlerts,
-    contraindicationAlerts,
-    generatedAt: new Date(),
-    aiModelVersion: 'mock-clinical-engine-v1',
-  };
+  const whoAtc = codes.find((c) => c.system === 'WHO-ATC');
+  if (whoAtc?.code) return whoAtc.code;
+
+  const whoVatc = codes.find((c) => c.system === 'WHO-VATC' && c.code?.startsWith('Q'));
+  if (whoVatc?.code) return whoVatc.code.slice(1);
+
+  return null;
+}
+
+async function findAlternativesFromDrugDatabase(substanceName, countryCode = 'CH') {
+  if (!DRUG_DB_API_KEY) return [];
+
+  const xrefData = await resolveSubstanceXref(substanceName);
+  if (!xrefData) return [];
+
+  const atcCode = extractAtcCode(xrefData);
+  if (!atcCode) return [];
+
+  try {
+    const { data } = await axios.get(`${DRUG_DB_BASE_URL}/v1/atc/${atcCode}/drugs`, {
+      params: { country: countryCode, limit: 20 },
+      headers: { Authorization: `Bearer ${DRUG_DB_API_KEY}` },
+      timeout: 10000,
+    });
+    return data?.drugs || [];
+  } catch (err) {
+    console.error('Drug Database ATC drugs lookup failed for', atcCode, '-', err.response?.status || err.message);
+    return [];
+  }
 }
 
 module.exports = {
-  AI_LABEL,
-  generateClinicalRecommendation,
-  checkAllergyAlerts,
-  checkContraindications,
-  checkDrugInteractions,
+  lookupDrug,
+  lookupMultipleDrugs,
+  fetchFromOpenFDA,
+  findAlternativesFromDrugDatabase,
 };
