@@ -12,9 +12,8 @@ export async function getAlternatives(medicineId) {
   return data.data;
 }
 
-// Now backed by a single dedicated endpoint that works even when the
-// medicine isn't in the local catalogue (falls back to external Drug
-// Database API on the backend).
+// Works even when the medicine isn't in the local catalogue — the
+// backend falls back to the external Drug Database API in that case.
 export async function getAlternativesByName(name) {
   if (!name || !name.trim()) return { resolvedId: null, alternatives: [] };
   const { data } = await api.get('/medicines/alternatives-by-name', {
