@@ -10,18 +10,25 @@ const Medicine = require('../models/Medicine');
  *  2. If not found locally, fall back to the free, public OpenFDA
  *     Drug Label API (https://open.fda.gov/apis/drug/label/) which
  *     requires NO API key and NO signup.
+ *  3. For "same composition" alternatives specifically, fall back to
+ *     the Drug Database API (drug-database.com) using:
+ *       substance name -> xref (UNII + codes) -> ATC code -> drugs in
+ *       that ATC subtree.
+ *     NOTE: /v1/substances/{unii} on this provider returns 404 even
+ *     for valid UNIIs (provider-side data gap), so we deliberately do
+ *     NOT call it. Instead we extract the ATC code directly from the
+ *     /v1/substances/xref response's `codes` array.
  *
- * OpenFDA is a public FDA dataset — it is informational only and
+ * OpenFDA / RxNorm / Drug Database are informational only and
  * should never be treated as a substitute for clinical judgement.
  */
 
 const OPENFDA_BASE_URL = 'https://api.fda.gov/drug/label.json';
 
-// RxNorm (via NLM) integration.
-// RxNorm is used as an additional informational lookup.
-// Endpoint is public and generally requires no API key.
-// Note: RxNorm is not a substitute for clinical judgement.
 const RXNORM_BASE_URL = 'https://rxnav.nlm.nih.gov/';
+
+const DRUG_DB_BASE_URL = process.env.DRUG_DATABASE_API_URL || 'https://drug-database.com';
+const DRUG_DB_API_KEY = process.env.DRUG_DATABASE_API_KEY || null;
 
 function safeEncode(q) {
   return encodeURIComponent(q || '');
@@ -30,8 +37,6 @@ function safeEncode(q) {
 async function fetchFromRxNormByName(drugName) {
   if (!drugName) return null;
 
-  // 1) Find RxCUIs by name
-  // GET: /REST/rxcui.json?name=...
   try {
     const { data } = await axios.get(`${RXNORM_BASE_URL}REST/rxcui.json?name=${safeEncode(drugName)}`, {
       timeout: 10000,
@@ -40,9 +45,6 @@ async function fetchFromRxNormByName(drugName) {
     const rxcuis = data?.idGroup?.rxnormId || [];
     if (!rxcuis.length) return null;
 
-    // 2) Fetch approximate concept name(s)
-    // GET: /REST/clinDrugName.json?rxcui=...
-    // (This returns clinical drug names; we’ll use best-effort.)
     const rxcui = Array.isArray(rxcuis) ? rxcuis[0] : null;
     if (!rxcui) return null;
 
@@ -65,22 +67,14 @@ async function fetchFromRxNormByName(drugName) {
       dosageText: null,
     };
   } catch (err) {
-    // network errors / no match => return null
     console.error('RxNorm lookup failed for', drugName, '-', err.response?.status || err.message);
     return null;
   }
 }
 
-
-/**
- * Query OpenFDA for a drug by brand name or generic name.
- * Returns a normalized subset of fields, or null if nothing is found
- * or the request fails (network issues, no match, rate limit, etc).
- */
 async function fetchFromOpenFDA(drugName) {
   if (!drugName) return null;
 
-  // Try brand name first, then generic name, since OpenFDA indexes them separately.
   const searchAttempts = [
     `openfda.brand_name:"${drugName}"`,
     `openfda.generic_name:"${drugName}"`,
@@ -108,7 +102,6 @@ async function fetchFromOpenFDA(drugName) {
         dosageText: result.dosage_and_administration?.[0]?.slice(0, 1000) || null,
       };
     } catch (err) {
-      // 404 / no match / rate limit — just try the next search strategy.
       console.error('OpenFDA lookup failed for', search, '-', err.response?.status || err.message);
       continue;
     }
@@ -117,10 +110,6 @@ async function fetchFromOpenFDA(drugName) {
   return null;
 }
 
-/**
- * Look up a single drug by name.
- * Checks the local curated database first; falls back to OpenFDA.
- */
 async function lookupDrug(drugName) {
   if (!drugName || !drugName.trim()) {
     return { found: false, source: null, data: null };
@@ -138,7 +127,6 @@ async function lookupDrug(drugName) {
     return { found: true, source: 'local', data: localMatch };
   }
 
-  // External lookups (best-effort, informational only)
   const openFDAResult = await fetchFromOpenFDA(drugName);
   if (openFDAResult) {
     return { found: true, source: 'openfda', data: openFDAResult };
@@ -149,13 +137,9 @@ async function lookupDrug(drugName) {
     return { found: true, source: 'rxnorm', data: rxNormResult };
   }
 
-
   return { found: false, source: null, data: null };
 }
 
-/**
- * Search multiple drugs at once (e.g. checking a whole prescription list).
- */
 async function lookupMultipleDrugs(drugNames = []) {
   const results = await Promise.all(
     drugNames.map(async (name) => ({
@@ -166,8 +150,58 @@ async function lookupMultipleDrugs(drugNames = []) {
   return results;
 }
 
+async function resolveSubstanceXref(substanceName) {
+  if (!substanceName || !DRUG_DB_API_KEY) return null;
+  try {
+    const { data } = await axios.get(`${DRUG_DB_BASE_URL}/v1/substances/xref`, {
+      params: { name: substanceName },
+      headers: { Authorization: `Bearer ${DRUG_DB_API_KEY}` },
+      timeout: 10000,
+    });
+    return data || null;
+  } catch (err) {
+    console.error('Drug Database substance xref failed for', substanceName, '-', err.response?.status || err.message);
+    return null;
+  }
+}
+
+function extractAtcCode(xrefData) {
+  const codes = xrefData?.codes || [];
+
+  const whoAtc = codes.find((c) => c.system === 'WHO-ATC');
+  if (whoAtc?.code) return whoAtc.code;
+
+  const whoVatc = codes.find((c) => c.system === 'WHO-VATC' && c.code?.startsWith('Q'));
+  if (whoVatc?.code) return whoVatc.code.slice(1);
+
+  return null;
+}
+
+async function findAlternativesFromDrugDatabase(substanceName, countryCode = 'CH') {
+  if (!DRUG_DB_API_KEY) return [];
+
+  const xrefData = await resolveSubstanceXref(substanceName);
+  if (!xrefData) return [];
+
+  const atcCode = extractAtcCode(xrefData);
+  if (!atcCode) return [];
+
+  try {
+    const { data } = await axios.get(`${DRUG_DB_BASE_URL}/v1/atc/${atcCode}/drugs`, {
+      params: { country: countryCode, limit: 20 },
+      headers: { Authorization: `Bearer ${DRUG_DB_API_KEY}` },
+      timeout: 10000,
+    });
+    return data?.drugs || [];
+  } catch (err) {
+    console.error('Drug Database ATC drugs lookup failed for', atcCode, '-', err.response?.status || err.message);
+    return [];
+  }
+}
+
 module.exports = {
   lookupDrug,
   lookupMultipleDrugs,
   fetchFromOpenFDA,
+  findAlternativesFromDrugDatabase,
 };

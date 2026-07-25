@@ -7,25 +7,13 @@ const Medicine = require('../models/Medicine');
  * directly to a Prescription as "final" content, and it never marks a
  * prescription as approved. That gate is enforced exclusively in
  * prescriptionService.approvePrescription() by a doctor.
- *
- * NOTE: This version uses a built-in MOCK/simulated AI engine instead of
- * calling an external LLM (OpenAI/Gemini/etc). This avoids API costs,
- * quota limits (HTTP 429), and network dependency — useful for demos,
- * grading, and offline development. The output shape is identical to
- * what a real LLM-backed implementation would return, so this can be
- * swapped for a real API call later without touching any other file.
  */
 
 const AI_LABEL = 'AI Suggested - Pending Doctor Approval'; // Rule 1
 
-// External AI providers (e.g., Gemini)
-// Strategy: Gemini-first, with safe fallback to MOCK on missing key / failures.
 const AI_ENGINE = process.env.AI_ENGINE || 'gemini';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || null;
 
-
-// Simple keyword -> clinical suggestion knowledge base.
-// Each entry mimics what an LLM might return for that symptom pattern.
 const SYMPTOM_KNOWLEDGE_BASE = [
   {
     keywords: ['fever', 'temperature', 'chills'],
@@ -116,6 +104,29 @@ const SYMPTOM_KNOWLEDGE_BASE = [
       suggestedLabTests: ['Stool routine examination if symptoms persist'],
     },
   },
+  {
+    keywords: ['malaria', 'suspected malaria'],
+    probableDiagnoses: [
+      { diagnosis: 'Malaria — suspected, needs testing', confidence: 0.4 },
+    ],
+    medicineSuggestions: [
+      {
+        brandName: 'Dolo 650',
+        genericName: 'Paracetamol',
+        composition: 'Paracetamol 650mg',
+        dosage: '1 tablet',
+        frequency: 'Every 6-8 hours as needed for fever',
+        durationDays: 2,
+        instructions: 'For symptomatic fever relief only, while awaiting confirmatory testing. Do not substitute for antimalarial treatment once diagnosis is confirmed.',
+      },
+    ],
+    clinicalAdvice: {
+      dietRecommendations: ['Plenty of fluids'],
+      lifestyleRecommendations: ['Rest', 'Avoid exertion until diagnosis is confirmed'],
+      followUpSuggestions: ['Refer urgently for peripheral smear/rapid test — treatment depends on species identification'],
+      suggestedLabTests: ['Peripheral blood smear', 'Rapid malaria antigen test'],
+    },
+  },
 ];
 
 const DEFAULT_SUGGESTION = {
@@ -131,16 +142,8 @@ const DEFAULT_SUGGESTION = {
   },
 };
 
-/**
- * Simulates an LLM call: matches the patient's symptom text against
- * a small knowledge base and returns a structured suggestion object.
- * Always resolves (never throws), so the UI never sees a 429 or
- * network failure — this mirrors a real implementation's shape exactly.
- */
 async function callLanguageModel({ symptoms = '' }) {
-  // Always safe: never throw. If Gemini is enabled and fails, fallback to MOCK.
   const runMock = async () => {
-    // Simulate a short "thinking" delay so the UI loading state feels real.
     await new Promise((resolve) => setTimeout(resolve, 400));
 
     const lowerSymptoms = symptoms.toLowerCase();
@@ -152,7 +155,6 @@ async function callLanguageModel({ symptoms = '' }) {
       return DEFAULT_SUGGESTION;
     }
 
-    // Merge all matching entries (a patient may report multiple symptom groups).
     const merged = matches.reduce(
       (acc, entry) => ({
         probableDiagnoses: [...acc.probableDiagnoses, ...entry.probableDiagnoses],
@@ -188,7 +190,6 @@ async function callLanguageModel({ symptoms = '' }) {
       }
     );
 
-    // De-duplicate simple string lists.
     merged.clinicalAdvice.dietRecommendations = [
       ...new Set(merged.clinicalAdvice.dietRecommendations),
     ];
@@ -205,12 +206,10 @@ async function callLanguageModel({ symptoms = '' }) {
     return merged;
   };
 
-  // Gemini-first strategy
   if (AI_ENGINE === 'gemini' && GEMINI_API_KEY) {
     try {
       const axios = require('axios');
 
-      // Gemini free-tier via API key.
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
       const prompt = `You are a clinical decision support assistant for doctors.
@@ -228,7 +227,15 @@ Return ONLY valid JSON matching this schema:
 
 Symptoms: ${symptoms}
 
-Important: Provide safe, general suggestions for doctor review. Do not include anything non-JSON.`;
+Important: Even in cases that require confirmatory testing before a definitive diagnosis can be made
+(e.g. suspected malaria, suspected dengue, suspected typhoid), still suggest safe, symptomatic
+medicines (e.g. paracetamol for fever, ORS for dehydration) that can reasonably be given while
+awaiting test results — do NOT leave medicineSuggestions empty just because the diagnosis is
+unconfirmed. Do NOT suggest disease-specific definitive treatment (e.g. antimalarials, antibiotics
+targeting a specific unconfirmed pathogen) without a confirmed diagnosis; only suggest symptomatic/
+supportive care in those cases, and note in "instructions" that it is for symptomatic relief pending
+confirmatory testing. Provide safe, general suggestions for doctor review. Do not include anything
+non-JSON.`;
 
       const response = await axios.post(
         url,
@@ -248,7 +255,6 @@ Important: Provide safe, general suggestions for doctor review. Do not include a
       const text = response?.data?.candidates?.[0]?.content?.parts?.[0]?.text;
       if (!text) return runMock();
 
-      // Gemini may wrap JSON in code fences; attempt a cleanup.
       const cleaned = text
         .trim()
         .replace(/^```json\s*/i, '')
@@ -268,12 +274,10 @@ Important: Provide safe, general suggestions for doctor review. Do not include a
         },
       };
     } catch (err) {
-      // Any error => fallback to mock. Never throw.
       return runMock();
     }
   }
 
-  // No Gemini key / Gemini disabled => mock fallback
   return runMock();
 }
 
@@ -328,12 +332,6 @@ async function checkDrugInteractions(currentMedications = [], suggestedMedicines
   return warnings;
 }
 
-/**
- * Main entry point: SRS Module 5 Step 1-3.
- * Returns a recommendation object tagged with the compliance label.
- * Caller (prescriptionService) is responsible for persisting this
- * under prescription.aiRecommendation — NEVER under finalMedicines.
- */
 async function generateClinicalRecommendation({
   symptoms,
   medicalHistory,
