@@ -23,12 +23,8 @@ const Medicine = require('../models/Medicine');
  * should never be treated as a substitute for clinical judgement.
  */
 
-const OPENFDA_BASE_URL = 'https://api.fda.gov/drug/label.json';
-
-const RXNORM_BASE_URL = 'https://rxnav.nlm.nih.gov/';
-
 const DRUG_DB_BASE_URL = process.env.DRUG_DATABASE_API_URL || 'https://drug-database.com';
-const DRUG_DB_API_KEY = process.env.DRUG_DATABASE_API_KEY || null;
+const DRUG_DB_API_KEY = process.env.DRUG_DATABASE_API_KEY || dd_live_R8pD-VjCxwaUNfhACbvq_3-hnoxvPGUt;
 
 function safeEncode(q) {
   return encodeURIComponent(q || '');
