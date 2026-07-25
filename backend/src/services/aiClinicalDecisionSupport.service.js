@@ -7,25 +7,13 @@ const Medicine = require('../models/Medicine');
  * directly to a Prescription as "final" content, and it never marks a
  * prescription as approved. That gate is enforced exclusively in
  * prescriptionService.approvePrescription() by a doctor.
- *
- * NOTE: This version uses a built-in MOCK/simulated AI engine instead of
- * calling an external LLM (OpenAI/Gemini/etc). This avoids API costs,
- * quota limits (HTTP 429), and network dependency — useful for demos,
- * grading, and offline development. The output shape is identical to
- * what a real LLM-backed implementation would return, so this can be
- * swapped for a real API call later without touching any other file.
  */
 
 const AI_LABEL = 'AI Suggested - Pending Doctor Approval'; // Rule 1
 
-// External AI providers (e.g., Gemini)
-// Strategy: Gemini-first, with safe fallback to MOCK on missing key / failures.
 const AI_ENGINE = process.env.AI_ENGINE || 'gemini';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || null;
 
-
-// Simple keyword -> clinical suggestion knowledge base.
-// Each entry mimics what an LLM might return for that symptom pattern.
 const SYMPTOM_KNOWLEDGE_BASE = [
   {
     keywords: ['fever', 'temperature', 'chills'],
@@ -154,12 +142,6 @@ const DEFAULT_SUGGESTION = {
   },
 };
 
-/**
- * Simulates an LLM call: matches the patient's symptom text against
- * a small knowledge base and returns a structured suggestion object.
- * Always resolves (never throws), so the UI never sees a 429 or
- * network failure — this mirrors a real implementation's shape exactly.
- */
 async function callLanguageModel({ symptoms = '' }) {
   const runMock = async () => {
     await new Promise((resolve) => setTimeout(resolve, 400));
@@ -224,7 +206,6 @@ async function callLanguageModel({ symptoms = '' }) {
     return merged;
   };
 
-  // Gemini-first strategy
   if (AI_ENGINE === 'gemini' && GEMINI_API_KEY) {
     try {
       const axios = require('axios');
@@ -351,12 +332,6 @@ async function checkDrugInteractions(currentMedications = [], suggestedMedicines
   return warnings;
 }
 
-/**
- * Main entry point: SRS Module 5 Step 1-3.
- * Returns a recommendation object tagged with the compliance label.
- * Caller (prescriptionService) is responsible for persisting this
- * under prescription.aiRecommendation — NEVER under finalMedicines.
- */
 async function generateClinicalRecommendation({
   symptoms,
   medicalHistory,
