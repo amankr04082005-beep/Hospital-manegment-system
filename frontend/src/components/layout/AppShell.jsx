@@ -15,6 +15,7 @@ const NAV_BY_ROLE = {
   doctor: [
     { to: '/doctor/queue', label: 'My Patients Today' },
     { to: '/doctor/consultations', label: 'Consultations' },
+    { to: '/doctor/ai-clinical', label: 'AI Clinical Support' },
   ],
   pharmacist: [
     { to: '/pharmacist/prescriptions', label: 'Verify Prescriptions' },

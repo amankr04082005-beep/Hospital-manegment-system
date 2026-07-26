@@ -7,29 +7,40 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "seed": "node src/utils/seedData.js"
+    "seed": "node src/utils/seedData.js",
+    "test": "cross-env NODE_ENV=test jest --forceExit --detectOpenHandles",
+    "test:watch": "cross-env NODE_ENV=test jest --watch --forceExit",
+    "test:coverage": "cross-env NODE_ENV=test jest --coverage --forceExit"
   },
   "dependencies": {
-    "express": "^4.19.2",
-    "mongoose": "^8.5.1",
-    "dotenv": "^16.4.5",
+    "axios": "^1.7.3",
     "bcryptjs": "^2.4.3",
-    "jsonwebtoken": "^9.0.2",
     "cors": "^2.8.5",
-    "helmet": "^7.1.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
     "express-rate-limit": "^7.4.0",
     "express-validator": "^7.1.0",
+    "helmet": "^7.1.0",
+    "joi": "^18.2.3",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^8.5.1",
     "morgan": "^1.10.0",
-    "uuid": "^10.0.0",
-    "qrcode": "^1.5.4",
-    "nodemailer": "^6.9.14",
-    "twilio": "^5.2.2",
-    "axios": "^1.7.3",
     "multer": "^1.4.5-lts.1",
-    "pdfkit": "^0.15.0"
+    "nodemailer": "^6.9.14",
+    "pdfkit": "^0.15.0",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.8.3",
+    "swagger-jsdoc": "^6.3.0",
+    "swagger-ui-express": "^5.0.1",
+    "twilio": "^5.2.2",
+    "uuid": "^10.0.0",
+    "winston": "^3.13.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.4"
+    "cross-env": "^10.1.0",
+    "jest": "^30.4.2",
+    "nodemon": "^3.1.4",
+    "supertest": "^7.2.2"
   },
   "engines": {
     "node": ">=18.0.0"

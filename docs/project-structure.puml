@@ -1,0 +1,285 @@
+@startuml Hospital Management System - Complete Architecture
+
+!theme plain
+skinparam packageStyle rectangle
+skinparam backgroundColor #FEFEFE
+skinparam componentStyle rectangle
+
+' ============================================
+' ACTORS / USERS
+' ============================================
+actor "Patient" as Patient
+actor "Receptionist" as Receptionist
+actor "Doctor" as Doctor
+actor "Pharmacist" as Pharmacist
+actor "Administrator" as Admin
+
+' ============================================
+' FRONTEND LAYER
+' ============================================
+package "Frontend - React + Vite (port 3001)" as Frontend {
+  rectangle "main.jsx\n(Entry Point)" as Main
+  rectangle "App.jsx\n(Router + Providers)" as AppRouter
+  rectangle "AppShell.jsx\n(Sidebar Nav Layout)" as AppShell
+  rectangle "AuthContext.jsx\n(JWT Auth State)" as AuthContext
+  rectangle "ProtectedRoute.jsx\n(RBAC Guard)" as ProtectedRoute
+
+  package "Pages" as Pages {
+    package "Auth" as AuthPkg {
+      rectangle "LoginPage.jsx" as LoginPage
+      rectangle "RegisterPage.jsx" as RegisterPage
+    }
+    package "Patient" as PatientPkg {
+      rectangle "BookAppointmentPage.jsx" as BookAppt
+      rectangle "MyAppointmentsPage.jsx" as MyAppts
+      rectangle "MyPrescriptionsPage.jsx" as MyRx
+    }
+    package "Receptionist" as ReceptPkg {
+      rectangle "ReceptionQueuePage.jsx" as ReceptQueue
+      rectangle "RegisterWalkInPage.jsx" as WalkIn
+    }
+    package "Doctor" as DoctorPkg {
+      rectangle "DoctorQueuePage.jsx" as DocQueue
+      rectangle "ConsultationPage.jsx" as Consult
+      rectangle "AIClinicalDashboard.jsx" as AIDash
+    }
+    package "Pharmacist" as PharmPkg {
+      rectangle "VerifyPrescriptionPage.jsx" as VerifyRx
+      rectangle "InventoryPage.jsx" as Inventory
+    }
+    package "Admin" as AdminPkg {
+      rectangle "AdminOverviewPage.jsx" as AdminOvw
+      rectangle "AdminReportsPage.jsx" as AdminRpt
+    }
+  }
+
+  package "Services" as Services {
+    rectangle "api.js\n(Axios Instance)" as AxiosAPI
+    rectangle "auth.service.js" as AuthSvc
+    rectangle "appointment.service.js" as ApptSvc
+    rectangle "prescription.service.js" as RxSvc
+    rectangle "medicine.service.js" as MedSvc
+    rectangle "aiClinical.service.js\n(Calls Python ML)" as AISvc
+    rectangle "emr.service.js" as EMRSvc
+    rectangle "report.service.js" as RptSvc
+    rectangle "admin.service.js" as AdminSvc
+  }
+
+  rectangle "styles/globals.css" as Styles
+  rectangle "components/common/\nui.jsx, StatusBadges.jsx" as Common
+}
+
+' ============================================
+' BACKEND LAYER
+' ============================================
+package "Backend - Express + Mongoose (port 5000)" as Backend {
+  rectangle "server.js\n(Entry + MongoDB connect)" as Server
+  rectangle "app.js\n(Middleware + Routes)" as ExpressApp
+  rectangle "config/db.js\n(MongoDB Connection)" as DB
+  rectangle "config/roles.js\n(RBAC Permissions)" as Roles
+
+  package "Middleware" as Middleware {
+    rectangle "auth.middleware.js\n(JWT Verify)" as AuthMW
+    rectangle "rbac.middleware.js\n(Role Check)" as RBACMW
+    rectangle "validate.middleware.js\n(Input Validation)" as ValidateMW
+    rectangle "error.middleware.js\n(Error Handler)" as ErrorMW
+  }
+
+  package "Routes → Controllers" as Routes {
+    rectangle "/api/auth" as AuthRoute
+    rectangle "/api/appointments" as ApptRoute
+    rectangle "/api/prescriptions" as RxRoute
+    rectangle "/api/medicines" as MedRoute
+    rectangle "/api/emr" as EMRRoute
+    rectangle "/api/hospital" as HospRoute
+    rectangle "/api/reports" as RptRoute
+    rectangle "/api/admin" as AdminRoute
+
+    rectangle "auth.controller.js" as AuthCtrl
+    rectangle "appointment.controller.js" as ApptCtrl
+    rectangle "prescription.controller.js" as RxCtrl
+    rectangle "medicine.controller.js" as MedCtrl
+    rectangle "report.controller.js" as RptCtrl
+  }
+
+  package "Models (Mongoose Schemas)" as Models {
+    rectangle "User.js\n(patient/doctor/pharm/admin)" as UserModel
+    rectangle "Patient.js\n(medicalHistory+)" as PatientModel
+    rectangle "Doctor.js\n(specialization+)" as DoctorModel
+    rectangle "Appointment.js" as ApptModel
+    rectangle "Prescription.js\n(medicines[]+status)" as RxModel
+    rectangle "Medicine.js\n(composition+interactions)" as MedModel
+    rectangle "EmrEntry.js\n(consultation notes)" as EMRModel
+    rectangle "Branch.js\n(departments)" as BranchModel
+  }
+
+  package "Services" as BkServices {
+    rectangle "aiClinicalDecisionSupport\n.service.js\n(ML + Fallback Mock)" as BackendAISvc
+    rectangle "consultationNotes.service.js" as ConsultSvc
+    rectangle "drugDatabase.service.js" as DrugDBSvc
+    rectangle "prescription.service.js\n(CRUD + Approve)" as BkRxSvc
+    rectangle "notification.service.js" as NotifSvc
+  }
+
+  package "Utils" as Utils {
+    rectangle "seedData.js\n(Initial DB seed)" as Seed
+    rectangle "checkMedicines.js" as CheckMed
+  }
+
+  database "MongoDB" as MongoDB {
+    rectangle "Users\nPatients\nDoctors\nAppointments\nPrescriptions\nMedicines\nEMR\nBranches" as MongoColl
+  }
+}
+
+' ============================================
+' PYTHON ML SERVICE
+' ============================================
+package "Python ML - FastAPI (port 8000)" as PythonML {
+  rectangle "app.py\n(FastAPI Routes)" as PyApp
+  rectangle "services/clinical_decision.py\n(Orchestrator)" as PyOrch
+  rectangle "models/symptom_classifier.py\n(TF-IDF + NaiveBayes)" as PyClass
+  rectangle "models/medicine_recommender.py\n(Cosine Similarity)" as PyRec
+  rectangle "services/allergy_checker.py\n(Rule Engine)" as PyAllergy
+  rectangle "services/interaction_checker.py\n(Drug-Drug Check)" as PyInteract
+  rectangle "data/symptom_knowledge_base.py\n(13 Symptom Entries)" as PyKB
+  rectangle "requirements.txt\n(fastapi, numpy, uvicorn)" as PyReqs
+}
+
+' ============================================
+' MEDICINE ENGINE
+' ============================================
+package "Medicine Engine (Node.js)" as MedEngine {
+  rectangle "index.js\n(Logic)" as MedEngLogic
+  rectangle "test/logic.test.js\n(Tests)" as MedEngTest
+}
+
+' ============================================
+' CONNECTIONS - FRONTEND INTERNAL
+' ============================================
+Main -> AppRouter : "Renders"
+AppRouter -> AuthContext : "Wraps"
+AppRouter -> ProtectedRoute : "Wraps Routes"
+ProtectedRoute -> AppShell : "Layout"
+AppShell --> AuthPkg : "Nav"
+AppShell --> PatientPkg : "Nav"
+AppShell --> ReceptPkg : "Nav"
+AppShell --> DoctorPkg : "Nav"
+AppShell --> PharmPkg : "Nav"
+AppShell --> AdminPkg : "Nav"
+
+AuthPkg --> AuthSvc : "Calls"
+PatientPkg --> ApptSvc : "Calls"
+PatientPkg --> RxSvc : "Calls"
+DoctorPkg --> AISvc : "Calls"
+DoctorPkg --> ApptSvc : "Calls"
+DoctorPkg --> RxSvc : "Calls"
+PharmPkg --> MedSvc : "Calls"
+PharmPkg --> RxSvc : "Calls"
+
+Services --> AxiosAPI : "Uses"
+
+' ============================================
+' CONNECTIONS - FRONTEND TO BACKEND
+' ============================================
+AxiosAPI --> ExpressApp : "HTTP /api/*\n(proxy :3001→:5000)"
+AISvc --> PyApp : "HTTP :8000/api/v1/clinical/*\n(direct fetch, no proxy)"
+
+' ============================================
+' CONNECTIONS - BACKEND INTERNAL
+' ============================================
+Server -> ExpressApp : "Starts"
+Server -> DB : "connectDB()"
+ExpressApp --> AuthMW : "Uses"
+ExpressApp --> RBACMW : "Uses"
+ExpressApp --> ErrorMW : "Uses"
+ExpressApp --> ValidateMW : "Uses"
+ExpressApp --> Roles : "Reads"
+
+Routes --> ExpressApp : "Mounted at /api/*"
+AuthRoute --> AuthCtrl
+ApptRoute --> ApptCtrl
+RxRoute --> RxCtrl
+MedRoute --> MedCtrl
+RptRoute --> RptCtrl
+
+AuthCtrl --> UserModel : "CRUD"
+AuthCtrl --> PatientModel : "CRUD"
+ApptCtrl --> ApptModel : "CRUD"
+RxCtrl --> RxModel : "CRUD"
+RxCtrl --> BkRxSvc : "approvePrescription()\n(generate PDF)"
+MedCtrl --> MedModel : "CRUD"
+RptCtrl --> UserModel : "Queries"
+RptCtrl --> ApptModel : "Queries"
+RptCtrl --> RxModel : "Queries"
+
+BackendAISvc --> BkRxSvc : "generateClinicalRecommendation()"
+BackendAISvc --> DrugDBSvc : "checkAllergy/Contra/Interact"
+BackendAISvc --> PyApp : "HTTP call to :8000\n(fallback if fails)"
+ConsultSvc --> EMRModel : "CRUD"
+NotifSvc --> UserModel : "Email/SMS"
+
+Models --> MongoDB
+
+' ============================================
+' CONNECTIONS - PYTHON ML
+' ============================================
+PyApp --> PyOrch : "POST /api/v1/clinical/recommendation"
+PyOrch --> PyClass : "train() / predict_with_fallback()"
+PyOrch --> PyRec : "fit() / recommend()"
+PyOrch --> PyAllergy : "check_allergies() / check_contraindications()"
+PyOrch --> PyInteract : "check_interactions()"
+PyClass --> PyKB : "Trains on keyword+disease pairs"
+PyRec --> PyKB : "TF-IDF fit & cosine similarity"
+PyAllergy --> PyKB : "Reads ALLERGY_TRIGGERS, CONTRADICTIONS"
+PyInteract --> PyKB : "Reads MEDICINE_INTERACTIONS"
+
+' ============================================
+' USER ROLES & INTERACTIONS
+' ============================================
+Patient --> LoginPage : "Login (JWT)"
+Patient --> BookAppt : "1. Book Appointment"
+Patient --> MyAppts : "2. View Status"
+Patient --> MyRx : "3. View Prescriptions"
+
+Receptionist --> LoginPage : "Login"
+Receptionist --> WalkIn : "1. Register Walk-in"
+Receptionist --> ReceptQueue : "2. Manage Queue"
+
+Doctor --> LoginPage : "Login"
+Doctor --> DocQueue : "1. View Today's Patients"
+Doctor --> Consult : "2. Conduct Consultation"
+Doctor --> AIDash : "3. AI Clinical Support"
+Doctor --> Consult : "4. Approve Prescription"
+
+Pharmacist --> LoginPage : "Login"
+Pharmacist --> VerifyRx : "1. Verify Prescriptions"
+Pharmacist --> Inventory : "2. Manage Inventory"
+
+Admin --> LoginPage : "Login"
+Admin --> AdminOvw : "1. Hospital Overview"
+Admin --> AdminRpt : "2. Reports & Analytics"
+
+' ============================================
+' DATA FLOW NOTES
+' ============================================
+note right of AIDash
+  **AI Clinical Flow:**
+  1. Doctor enters symptoms
+  2. AISvc → POST Python ML :8000
+  3. ML: TF-IDF → NaiveBayes → Diagnoses
+  4. ML: CosineSimilarity → Meds
+  5. Safety: Allergy+Contra+Interaction
+  6. Response → Render Results
+  Fallback: BackendAISvc mock engine
+end note
+
+note bottom of Roles
+  **5 Roles with RBAC:**
+  patient: view own
+  receptionist: queue mgmt
+  doctor: consult, approve Rx
+  pharmacist: verify, inventory
+  admin: users, reports, system
+end note
+
+@enduml

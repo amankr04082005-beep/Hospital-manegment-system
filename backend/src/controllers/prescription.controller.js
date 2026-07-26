@@ -212,4 +212,47 @@ async function addConsultationNotes(req, res, next) {
   }
 }
 
-module.exports = { createDraft, reviewDraft, approve, generate, share, getOne, getMine, getPatientHistory, downloadPdf, verify, addConsultationNotes };
+// POST /api/prescriptions/:id/suggest-alternatives (Pharmacist only)
+// SRS Module 6 - Pharmacist permission: Suggest Alternatives.
+async function suggestAlternatives(req, res, next) {
+  try {
+    if (req.user.role !== 'pharmacist') {
+      return res.status(403).json({ success: false, message: 'Only pharmacists can suggest alternatives.' });
+    }
+
+    const { items } = req.body;
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ success: false, message: 'items array is required.' });
+    }
+
+    const prescription = await Prescription.findById(req.params.id);
+    if (!prescription) return res.status(404).json({ success: false, message: 'Prescription not found.' });
+
+    if (!['doctor_approved', 'prescription_generated', 'shared_with_patient'].includes(prescription.status)) {
+      return res.status(400).json({ success: false, message: 'Prescription is not yet approved.' });
+    }
+
+    prescription.pharmacistAlternatives = prescription.pharmacistAlternatives || [];
+    prescription.pharmacistAlternatives.push({
+      suggestedBy: req.user._id,
+      suggestedByName: req.user.fullName,
+      suggestedAt: new Date(),
+      items,
+    });
+
+    prescription.auditTrail.push({
+      eventType: 'pharmacist_alternatives_suggested',
+      actor: req.user._id,
+      actorRole: req.user.role,
+      details: { itemCount: items.length },
+      ipAddress: req.ipAddress,
+    });
+
+    await prescription.save();
+    res.json({ success: true, message: 'Alternatives suggested.', data: prescription });
+  } catch (error) {
+    next(error);
+  }
+}
+
+module.exports = { createDraft, reviewDraft, approve, generate, share, getOne, getMine, getPatientHistory, downloadPdf, verify, addConsultationNotes, suggestAlternatives };

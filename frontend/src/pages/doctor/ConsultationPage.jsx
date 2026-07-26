@@ -257,40 +257,44 @@ export default function ConsultationPage() {
   }, [patientId]);
 
   useEffect(() => {
-    async function loadHistory() {
-      if (!patientId) {
-        // If patientId is missing but appointmentId exists, fetch appointment and derive patient
-        if (appointmentId) {
-          try {
-            const appt = await appointmentService.getAppointmentById(appointmentId);
-            if (appt && appt.patient && appt.patient._id) {
-              setPatientId(appt.patient._id);
-              // continue to load history using the newly set patientId
-            } else {
-              setEmrLoading(false);
-              return;
-            }
-          } catch (err) {
-            toast.error(err.response?.data?.message || 'Could not load appointment details.');
-            setEmrLoading(false);
-            return;
-          }
-        } else {
-          setEmrLoading(false);
-          return;
-        }
-      }
+    let cancelled = false;
+    async function loadHistory(resolvedPatientId) {
       try {
-        const data = await emrService.getPatientHistory(patientId);
-        setEmrHistory(data);
+        const data = await emrService.getPatientHistory(resolvedPatientId);
+        if (!cancelled) setEmrHistory(data);
       } catch (err) {
-        toast.error(err.response?.data?.message || 'Could not load patient medical history.');
+        if (!cancelled) toast.error(err.response?.data?.message || 'Could not load patient medical history.');
       } finally {
-        setEmrLoading(false);
+        if (!cancelled) setEmrLoading(false);
       }
     }
-    loadHistory();
-  }, [patientId]);
+    async function resolveAndLoad() {
+      if (patientId) {
+        loadHistory(patientId);
+        return;
+      }
+      if (appointmentId) {
+        try {
+          const appt = await appointmentService.getAppointmentById(appointmentId);
+          if (appt && appt.patient && appt.patient._id) {
+            setPatientId(appt.patient._id);
+            loadHistory(appt.patient._id);
+          } else {
+            if (!cancelled) setEmrLoading(false);
+          }
+        } catch (err) {
+          if (!cancelled) toast.error(err.response?.data?.message || 'Could not load appointment details.');
+          if (!cancelled) setEmrLoading(false);
+        }
+      } else {
+        if (!cancelled) setEmrLoading(false);
+      }
+    }
+    resolveAndLoad();
+    return () => {
+      cancelled = true;
+    };
+  }, [patientId, appointmentId]);
 
   async function handleAddRecord(e) {
     e.preventDefault();

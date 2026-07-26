@@ -1,0 +1,86 @@
+/* -----------------------------------------------
+   Skeleton / Shimmer loading placeholders
+   ----------------------------------------------- */
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--border) 25%,
+    var(--paper) 50%,
+    var(--border) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton {
+  border-radius: var(--radius-sm);
+}
+
+.skeleton--text {
+  background: var(--border);
+  opacity: 0.6;
+}
+
+.skeleton--heading {
+  background: var(--border-strong);
+  opacity: 0.5;
+  border-radius: var(--radius-sm);
+}
+
+.skeleton-group {
+  padding: 4px 0;
+}
+
+/* Skeleton Card */
+.skeleton-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 24px;
+  box-shadow: var(--shadow-card);
+}
+
+/* Skeleton Table */
+.skeleton-table {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.skeleton-table__row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: 16px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.skeleton-table__row:last-child {
+  border-bottom: none;
+}
+
+/* Pulse variant for critical data */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.skeleton--pulse {
+  animation: pulse 1.6s ease-in-out infinite;
+}
+

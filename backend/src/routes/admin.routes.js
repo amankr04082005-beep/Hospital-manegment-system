@@ -3,6 +3,7 @@ const { authenticate } = require('../middleware/auth.middleware');
 const User = require('../models/User');
 const Doctor = require('../models/Doctor');
 const { Branch, Department } = require('../models/Branch');
+const { getAuditLogs } = require('../middleware/audit.middleware');
 
 const router = express.Router();
 router.use(authenticate);
@@ -136,5 +137,8 @@ router.get('/departments', async (req, res, next) => {
     next(error);
   }
 });
+
+// GET /api/admin/audit-logs — view immutable audit trail (paginated)
+router.get('/audit-logs', getAuditLogs);
 
 module.exports = router;

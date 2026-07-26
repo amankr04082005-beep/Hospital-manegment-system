@@ -42,4 +42,7 @@ router.post('/:id/verify', ctrl.verify);
 // SRS Module 7 — AI Voice Assistant: persist captured conversation + generated clinical notes
 router.post('/:id/consultation-notes', authorize('prescription:approve'), ctrl.addConsultationNotes);
 
+// SRS Module 6 - Pharmacist permission: Suggest Alternatives.
+router.post('/:id/suggest-alternatives', authorize('medicine:suggest-alternative'), ctrl.suggestAlternatives);
+
 module.exports = router;

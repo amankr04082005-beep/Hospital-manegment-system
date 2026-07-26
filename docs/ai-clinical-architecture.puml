@@ -1,0 +1,48 @@
+@startuml
+title AI Clinical Decision Support Architecture
+
+actor Doctor
+actor Patient
+
+package "Frontend" {
+  component Dashboard as "AIClinicalDashboard"
+  component Svc as "aiClinical.service"
+  component Auth as "AuthContext"
+  component Nav as "AppShell"
+  Dashboard --> Svc
+  Dashboard --> Auth
+  Nav --> Dashboard
+}
+
+package "Backend" {
+  component App as "Express app.js"
+  component AiBackend as "aiClinicalDecisionSupport.service"
+  database DB as "MongoDB"
+  App --> AiBackend
+  AiBackend --> DB
+}
+
+package "Python ML" {
+  component FastAPI
+  component Orchestrator as "clinical_decision"
+  component Classifier as "symptom_classifier"
+  component Recommender as "medicine_recommender"
+  component Allergy as "allergy_checker"
+  component Interact as "interaction_checker"
+  component KB as "knowledge_base"
+  FastAPI --> Orchestrator
+  Orchestrator --> Classifier
+  Orchestrator --> Recommender
+  Orchestrator --> Allergy
+  Orchestrator --> Interact
+  Classifier --> KB
+  Recommender --> KB
+  Allergy --> KB
+  Interact --> KB
+}
+
+Doctor --> Dashboard
+Dashboard --> Svc
+Svc --> FastAPI : HTTP :8000
+Svc --> AiBackend : Fallback
+@enduml

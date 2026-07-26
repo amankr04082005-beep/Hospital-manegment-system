@@ -1,4 +1,5 @@
 const Medicine = require('../models/Medicine');
+const axios = require('axios');
 
 /**
  * SRS Module 5 — Step 2 & 3: AI Analysis + AI Recommendations.
@@ -7,12 +8,51 @@ const Medicine = require('../models/Medicine');
  * directly to a Prescription as "final" content, and it never marks a
  * prescription as approved. That gate is enforced exclusively in
  * prescriptionService.approvePrescription() by a doctor.
+ *
+ * Uses Python ML service (FastAPI + numpy) for intelligent symptom
+ * classification via TF-IDF + Naive Bayes. Falls back to local mock
+ * engine if Python service is unreachable.
  */
 
 const AI_LABEL = 'AI Suggested - Pending Doctor Approval'; // Rule 1
 
-const AI_ENGINE = process.env.AI_ENGINE || 'gemini';
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || null;
+const AI_ENGINE = process.env.AI_ENGINE || 'python_ml';
+const PYTHON_ML_URL = process.env.AI_CLINICAL_SERVICE_URL || 'http://127.0.0.1:8000';
+
+async function callPythonMLEngine({ symptoms, medicalHistory, allergies, existingDiseases, currentMedications, labReports }) {
+  try {
+    const response = await axios.post(
+      `${PYTHON_ML_URL}/api/v1/clinical/recommendation`,
+      {
+        symptoms: symptoms || '',
+        medical_history: medicalHistory || {},
+        allergies: allergies || [],
+        existing_diseases: existingDiseases || [],
+        current_medications: currentMedications || [],
+        lab_reports: labReports || [],
+      },
+      { timeout: 15000 }
+    );
+
+    if (response.data && response.data.success) {
+      const result = response.data.data;
+      return {
+        probableDiagnoses: result.probableDiagnoses || [],
+        medicineSuggestions: result.medicineSuggestions || [],
+        clinicalAdvice: result.clinicalAdvice || {
+          dietRecommendations: [],
+          lifestyleRecommendations: [],
+          followUpSuggestions: [],
+          suggestedLabTests: [],
+        },
+      };
+    }
+    return null;
+  } catch (err) {
+    console.warn('Python ML service unavailable, falling back to mock engine:', err.message);
+    return null;
+  }
+}
 
 const SYMPTOM_KNOWLEDGE_BASE = [
   {
@@ -206,76 +246,10 @@ async function callLanguageModel({ symptoms = '' }) {
     return merged;
   };
 
-  if (AI_ENGINE === 'gemini' && GEMINI_API_KEY) {
-    try {
-      const axios = require('axios');
-
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-
-      const prompt = `You are a clinical decision support assistant for doctors.
-Return ONLY valid JSON matching this schema:
-{
-  "probableDiagnoses": [{"diagnosis": string, "confidence": number}],
-  "medicineSuggestions": [{"brandName": string, "genericName": string, "composition": string, "dosage": string, "frequency": string, "durationDays": number, "instructions": string}],
-  "clinicalAdvice": {
-     "dietRecommendations": [string],
-     "lifestyleRecommendations": [string],
-     "followUpSuggestions": [string],
-     "suggestedLabTests": [string]
-  }
-}
-
-Symptoms: ${symptoms}
-
-Important: Even in cases that require confirmatory testing before a definitive diagnosis can be made
-(e.g. suspected malaria, suspected dengue, suspected typhoid), still suggest safe, symptomatic
-medicines (e.g. paracetamol for fever, ORS for dehydration) that can reasonably be given while
-awaiting test results — do NOT leave medicineSuggestions empty just because the diagnosis is
-unconfirmed. Do NOT suggest disease-specific definitive treatment (e.g. antimalarials, antibiotics
-targeting a specific unconfirmed pathogen) without a confirmed diagnosis; only suggest symptomatic/
-supportive care in those cases, and note in "instructions" that it is for symptomatic relief pending
-confirmatory testing. Provide safe, general suggestions for doctor review. Do not include anything
-non-JSON.`;
-
-      const response = await axios.post(
-        url,
-        {
-          contents: [{
-            role: 'user',
-            parts: [{ text: prompt }],
-          }],
-          generationConfig: {
-            temperature: 0.2,
-            maxOutputTokens: 800,
-          },
-        },
-        { timeout: 12000 }
-      );
-
-      const text = response?.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!text) return runMock();
-
-      const cleaned = text
-        .trim()
-        .replace(/^```json\s*/i, '')
-        .replace(/^```\s*/i, '')
-        .replace(/```\s*$/i, '');
-
-      const parsed = JSON.parse(cleaned);
-
-      return {
-        probableDiagnoses: Array.isArray(parsed.probableDiagnoses) ? parsed.probableDiagnoses : [],
-        medicineSuggestions: Array.isArray(parsed.medicineSuggestions) ? parsed.medicineSuggestions : [],
-        clinicalAdvice: parsed.clinicalAdvice || {
-          dietRecommendations: [],
-          lifestyleRecommendations: [],
-          followUpSuggestions: [],
-          suggestedLabTests: [],
-        },
-      };
-    } catch (err) {
-      return runMock();
-    }
+  // Try Python ML service first
+  const pythonResult = await callPythonMLEngine({ symptoms });
+  if (pythonResult) {
+    return pythonResult;
   }
 
   return runMock();
@@ -367,7 +341,7 @@ async function generateClinicalRecommendation({
     allergyAlerts,
     contraindicationAlerts,
     generatedAt: new Date(),
-    aiModelVersion: 'mock-clinical-engine-v1',
+    aiModelVersion: 'python-ml-clinical-engine-v1',
   };
 }
 
