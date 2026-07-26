@@ -1,6 +1,18 @@
+const mongoose = require('mongoose');
 const { lookupDrug, lookupMultipleDrugs, fetchFromOpenFDA } = require('../services/drugDatabase.service');
 
 describe('Drug Database Service Unit Tests', () => {
+  beforeAll(async () => {
+    const testUri = process.env.MONGO_URI_TEST || 'mongodb://localhost:27017/hospital_test';
+    if (mongoose.connection.readyState === 0) {
+      await mongoose.connect(testUri);
+    }
+  });
+
+  afterAll(async () => {
+    await mongoose.disconnect();
+  });
+
   describe('lookupDrug()', () => {
     it('should return not found for empty input', async () => {
       const result = await lookupDrug('');
@@ -45,11 +57,8 @@ describe('Drug Database Service Unit Tests', () => {
     });
 
     it('should handle network errors gracefully', async () => {
-      // This tests the error handling path
       const result = await fetchFromOpenFDA('NONEXISTENT_DRUG_XYZ_12345');
-      // Should either return data or null — not throw
       expect(result === null || result.source === 'openfda').toBe(true);
     }, 15000);
   });
 });
-
