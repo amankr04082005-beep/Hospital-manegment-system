@@ -101,6 +101,7 @@ const auditEventSchema = new mongoose.Schema(
         'consultation_notes_generated', // SRS Module 7
         'prescription_verified_by_pharmacist', // SRS Module 2.4
         'pharmacist_alternative_suggestions', // Module 6 pharmacist suggestions
+        'followup_status_updated', // SRS Module 8
       ],
       required: true,
     },
@@ -131,7 +132,6 @@ const pharmacistAlternativeSuggestionSchema = new mongoose.Schema(
   { _id: false }
 );
 
-
 const prescriptionSchema = new mongoose.Schema(
   {
     prescriptionNumber: { type: String, unique: true, sparse: true }, // assigned only on generation (Rule 3)
@@ -158,6 +158,14 @@ const prescriptionSchema = new mongoose.Schema(
       followUpInstructions: String,
     },
     followUpDate: Date,
+
+    // SRS Module 8 — Follow-up Management
+    followUpStatus: {
+      type: String,
+      enum: ['none', 'pending', 'scheduled', 'completed', 'missed'],
+      default: 'none',
+    },
+    followUpAppointment: { type: mongoose.Schema.Types.ObjectId, ref: 'Appointment' },
 
     status: {
       type: String,
@@ -210,6 +218,7 @@ const prescriptionSchema = new mongoose.Schema(
 
 prescriptionSchema.index({ patient: 1, createdAt: -1 });
 prescriptionSchema.index({ status: 1 });
+prescriptionSchema.index({ followUpStatus: 1, followUpDate: 1 });
 
 // Guard: patient-facing serialization must strip AI block + consultation notes.
 prescriptionSchema.methods.toPatientView = function toPatientView() {
@@ -226,9 +235,8 @@ prescriptionSchema.methods.toPatientView = function toPatientView() {
   delete obj.consultationNotes; // never expose raw conversation transcript/notes to patient
   delete obj.auditTrail;
   // policy: hide pharmacist alternative suggestions from patient-facing view
-    delete obj.pharmacistAlternativeSuggestions;
-    return obj;
+  delete obj.pharmacistAlternativeSuggestions;
+  return obj;
 };
 
 module.exports = mongoose.model('Prescription', prescriptionSchema);
-
