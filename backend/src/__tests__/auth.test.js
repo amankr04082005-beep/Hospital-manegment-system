@@ -102,7 +102,7 @@ describe('Auth API Integration Tests', () => {
         .expect(200);
 
       expect(res.body.success).toBe(true);
-      expect(res.body.data.email).toBe(testUser.email);
+      expect(res.body.data.user.email).toBe(testUser.email);
     });
 
     it('should reject without token', async () => {
@@ -112,4 +112,3 @@ describe('Auth API Integration Tests', () => {
     });
   });
 });
-
