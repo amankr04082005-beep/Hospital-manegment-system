@@ -25,5 +25,8 @@
     "backend",
     "frontend",
     "medicine-engine"
-  ]
+  ],
+  "dependencies": {
+    "mongosh": "^2.9.2"
+  }
 }

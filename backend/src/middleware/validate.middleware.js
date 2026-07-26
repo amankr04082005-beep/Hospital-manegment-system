@@ -90,6 +90,23 @@ const registerSchema = Joi.object({
     .messages({ 'string.min': 'Password must be at least 6 characters', 'any.required': 'Password is required' }),
   mobileNumber: Joi.string().pattern(/^\+?[\d\s-]{7,20}$/).optional(),
   role: Joi.string().valid('patient', 'doctor', 'pharmacist', 'receptionist').default('patient'),
+  // Patient profile fields (only used when role === 'patient')
+  dob: Joi.date().iso().optional(),
+  gender: Joi.string().valid('male', 'female', 'other').optional(),
+  bloodGroup: Joi.string().valid('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'unknown').optional(),
+  address: Joi.object({
+    line1: Joi.string().optional().allow(''),
+    line2: Joi.string().optional().allow(''),
+    city: Joi.string().optional().allow(''),
+    state: Joi.string().optional().allow(''),
+    pincode: Joi.string().optional().allow(''),
+    country: Joi.string().optional().allow(''),
+  }).optional(),
+  emergencyContact: Joi.object({
+    name: Joi.string().optional().allow(''),
+    relationship: Joi.string().optional().allow(''),
+    mobileNumber: Joi.string().optional().allow(''),
+  }).optional(),
 });
 
 const loginSchema = Joi.object({
