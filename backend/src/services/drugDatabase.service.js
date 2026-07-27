@@ -188,7 +188,7 @@ async function findAlternativesFromDrugDatabase(substanceName, countryCode = 'CH
 
   try {
     const { data } = await axios.get(`${DRUG_DB_BASE_URL}/v1/atc/${atcCode}/drugs`, {
-      params: { country: countryCode, limit: 100 },
+      params: { country: countryCode, limit: 20 },
       headers: { Authorization: `Bearer ${DRUG_DB_API_KEY}` },
       timeout: 10000,
     });
@@ -198,10 +198,39 @@ async function findAlternativesFromDrugDatabase(substanceName, countryCode = 'CH
     return [];
   }
 }
+async function searchDrugDatabase(query, country = "IN", limit = 20) {
+  if (!query || !DRUG_DB_API_KEY) return [];
 
+  try {
+    const { data } = await axios.get(
+      `${DRUG_DB_BASE_URL}/v1/drugs/search`,
+      {
+        params: {
+          q: query,
+          country,
+          limit,
+        },
+        headers: {
+          Authorization: `Bearer ${DRUG_DB_API_KEY}`,
+        },
+        timeout: 15000,
+      }
+    );
+
+    return data?.drugs || data?.results || data?.items || [];
+  } catch (err) {
+    console.error(
+      "Drug Database Search Error:",
+      err.response?.status,
+      err.response?.data || err.message
+    );
+    return [];
+  }
+}
 module.exports = {
   lookupDrug,
   lookupMultipleDrugs,
   fetchFromOpenFDA,
   findAlternativesFromDrugDatabase,
+  searchDrugDatabase,
 };
