@@ -188,7 +188,7 @@ async function findAlternativesFromDrugDatabase(substanceName, countryCode = 'CH
 
   try {
     const { data } = await axios.get(`${DRUG_DB_BASE_URL}/v1/atc/${atcCode}/drugs`, {
-      params: { country: countryCode, limit: 20 },
+      params: { country: countryCode, limit: 100 },
       headers: { Authorization: `Bearer ${DRUG_DB_API_KEY}` },
       timeout: 10000,
     });
