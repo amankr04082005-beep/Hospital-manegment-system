@@ -70,3 +70,15 @@ export async function addConsultationNotes(id, rawTranscript) {
   const { data } = await api.post(`/prescriptions/${id}/consultation-notes`, { rawTranscript });
   return data.data;
 }
+// SRS Module 8 — Follow-up Management: worklist for doctor/receptionist/admin.
+export async function getFollowUps(status) {
+  const { data } = await api.get('/prescriptions/followups', { params: status ? { status } : {} });
+  return data.data;
+}
+
+// SRS Module 8 — update a prescription's follow-up status, optionally
+// linking a newly booked appointment.
+export async function updateFollowUpStatus(id, followUpStatus, appointmentId) {
+  const { data } = await api.patch(`/prescriptions/${id}/followup-status`, { followUpStatus, appointmentId });
+  return data.data;
+}
