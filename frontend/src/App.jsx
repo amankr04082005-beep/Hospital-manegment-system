@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+﻿import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/common/ProtectedRoute';
@@ -23,6 +23,7 @@ import VerifyPrescriptionPage from './pages/pharmacist/VerifyPrescriptionPage';
 import InventoryPage from './pages/pharmacist/InventoryPage';
 import AdminOverviewPage from './pages/admin/AdminOverviewPage';
 import AdminReportsPage from './pages/admin/AdminReportsPage';
+import FollowUpsPage from './pages/shared/FollowUpsPage';
 
 export default function App() {
   return (
@@ -60,16 +61,19 @@ export default function App() {
 
               <Route path="/receptionist/queue" element={<ReceptionQueuePage />} />
               <Route path="/receptionist/book" element={<RegisterWalkInPage />} />
+              <Route path="/receptionist/followups" element={<FollowUpsPage />} />
 
               <Route path="/doctor/queue" element={<DoctorQueuePage />} />
               <Route path="/doctor/consultations" element={<ConsultationPage />} />
               <Route path="/doctor/ai-clinical" element={<AIClinicalDashboard />} />
+              <Route path="/doctor/followups" element={<FollowUpsPage />} />
 
               <Route path="/pharmacist/prescriptions" element={<VerifyPrescriptionPage />} />
               <Route path="/pharmacist/inventory" element={<InventoryPage />} />
 
               <Route path="/admin/overview" element={<AdminOverviewPage />} />
               <Route path="/admin/reports" element={<AdminReportsPage />} />
+              <Route path="/admin/followups" element={<FollowUpsPage />} />
             </Route>
 
             <Route path="/" element={<Navigate to="/login" replace />} />
@@ -80,3 +84,9 @@ export default function App() {
     </ErrorBoundary>
   );
 }
+
+
+
+
+
+
