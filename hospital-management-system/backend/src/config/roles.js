@@ -26,6 +26,7 @@ const PERMISSIONS = {
     'appointment:forward',
     'appointment:reschedule',
     'queue:manage',
+    'followup:manage',
   ],
   [ROLES.DOCTOR]: [
     'appointment:view-all',
@@ -38,6 +39,7 @@ const PERMISSIONS = {
     'prescription:approve', // exclusive approval right
     'diagnosis:record',
     'followup:add-advice',
+    'followup:manage',
   ],
   [ROLES.PHARMACIST]: [
     'prescription:view',
@@ -52,6 +54,7 @@ const PERMISSIONS = {
     'report:view-all',
     'audit:view',
     'system:configure',
+    'followup:manage',
   ],
 };
 

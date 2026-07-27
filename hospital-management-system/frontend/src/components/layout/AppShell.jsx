@@ -11,10 +11,12 @@ const NAV_BY_ROLE = {
   receptionist: [
     { to: '/receptionist/queue', label: "Today's Queue" },
     { to: '/receptionist/book', label: 'Register Walk-in' },
+    { to: '/receptionist/followups', label: 'Follow-ups' },
   ],
   doctor: [
     { to: '/doctor/queue', label: 'My Patients Today' },
     { to: '/doctor/consultations', label: 'Consultations' },
+    { to: '/doctor/followups', label: 'Follow-ups' },
   ],
   pharmacist: [
     { to: '/pharmacist/prescriptions', label: 'Verify Prescriptions' },
@@ -23,6 +25,7 @@ const NAV_BY_ROLE = {
   admin: [
     { to: '/admin/overview', label: 'Hospital Overview' },
     { to: '/admin/reports', label: 'Reporting & Analytics' },
+    { to: '/admin/followups', label: 'Follow-ups' },
   ],
 };
 

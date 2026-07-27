@@ -7,6 +7,15 @@ const { generateClinicalNotes } = require('../services/consultationNotes.service
 async function createDraft(req, res, next) {
   try {
     const { appointmentId, patientId, symptoms, labReports } = req.body;
+
+    // Prevents: "Cast to ObjectId failed for value \"undefined\" at path \"_id\" for model \"Patient\""
+    if (!appointmentId) {
+      return res.status(400).json({ success: false, message: 'appointmentId is required.' });
+    }
+    if (!patientId) {
+      return res.status(400).json({ success: false, message: 'patientId is required.' });
+    }
+
     const doctor = await Doctor.findOne({ user: req.user._id });
     if (!doctor) return res.status(403).json({ success: false, message: 'Doctor profile required.' });
 
@@ -213,46 +222,73 @@ async function addConsultationNotes(req, res, next) {
 }
 
 // POST /api/prescriptions/:id/suggest-alternatives (Pharmacist only)
-// SRS Module 6 - Pharmacist permission: Suggest Alternatives.
 async function suggestAlternatives(req, res, next) {
   try {
-    if (req.user.role !== 'pharmacist') {
-      return res.status(403).json({ success: false, message: 'Only pharmacists can suggest alternatives.' });
-    }
-
     const { items } = req.body;
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ success: false, message: 'items array is required.' });
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ success: false, message: 'items[] is required.' });
     }
 
-    const prescription = await Prescription.findById(req.params.id);
-    if (!prescription) return res.status(404).json({ success: false, message: 'Prescription not found.' });
+    const prescription = await prescriptionService.suggestPharmacistAlternatives(
+      req.params.id,
+      req.user,
+      { items },
+      req.ipAddress
+    );
 
-    if (!['doctor_approved', 'prescription_generated', 'shared_with_patient'].includes(prescription.status)) {
-      return res.status(400).json({ success: false, message: 'Prescription is not yet approved.' });
-    }
-
-    prescription.pharmacistAlternatives = prescription.pharmacistAlternatives || [];
-    prescription.pharmacistAlternatives.push({
-      suggestedBy: req.user._id,
-      suggestedByName: req.user.fullName,
-      suggestedAt: new Date(),
-      items,
-    });
-
-    prescription.auditTrail.push({
-      eventType: 'pharmacist_alternatives_suggested',
-      actor: req.user._id,
-      actorRole: req.user.role,
-      details: { itemCount: items.length },
-      ipAddress: req.ipAddress,
-    });
-
-    await prescription.save();
-    res.json({ success: true, message: 'Alternatives suggested.', data: prescription });
+    res.json({ success: true, message: 'Alternatives suggested by pharmacist.', data: prescription });
   } catch (error) {
     next(error);
   }
 }
 
-module.exports = { createDraft, reviewDraft, approve, generate, share, getOne, getMine, getPatientHistory, downloadPdf, verify, addConsultationNotes, suggestAlternatives };
+// GET /api/prescriptions/followups  (Receptionist/Doctor/Admin only)
+// SRS Module 9 — Follow-up Management worklist.
+async function listFollowUps(req, res, next) {
+  try {
+    if (req.user.role === 'patient' || req.user.role === 'pharmacist') {
+      return res.status(403).json({ success: false, message: 'Not authorized to view the follow-up worklist.' });
+    }
+
+    let doctorId = req.query.doctorId;
+    if (req.user.role === 'doctor') {
+      const doctor = await Doctor.findOne({ user: req.user._id });
+      if (!doctor) return res.status(403).json({ success: false, message: 'Doctor profile required.' });
+      doctorId = doctor._id;
+    }
+
+    const worklist = await prescriptionService.getFollowUpWorklist({
+      doctorId,
+      status: req.query.status,
+      from: req.query.from,
+      to: req.query.to,
+    });
+
+    res.json({ success: true, data: worklist });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// PATCH /api/prescriptions/:id/followup-status  (Receptionist/Doctor/Admin only)
+async function updateFollowUpStatus(req, res, next) {
+  try {
+    if (req.user.role === 'patient' || req.user.role === 'pharmacist') {
+      return res.status(403).json({ success: false, message: 'Not authorized to update follow-up status.' });
+    }
+
+    const { followUpStatus, followUpAppointmentId } = req.body;
+    const prescription = await prescriptionService.updateFollowUpStatus(
+      req.params.id,
+      { followUpStatus, followUpAppointmentId },
+      req.user,
+      req.ipAddress
+    );
+    res.json({ success: true, data: prescription });
+  } catch (error) {
+    next(error);
+  }
+}
+
+module.exports = { createDraft, reviewDraft, approve, generate, share, getOne, getMine, getPatientHistory, downloadPdf, verify, addConsultationNotes, suggestAlternatives, listFollowUps, updateFollowUpStatus };

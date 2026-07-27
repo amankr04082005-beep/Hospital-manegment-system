@@ -9,6 +9,7 @@ const Appointment = require('../models/Appointment');
 const aiService = require('./aiClinicalDecisionSupport.service');
 const { sharePrescriptionNotifications } = require('./notification.service');
 
+
 /**
  * SRS Module 5: full lifecycle enforcement.
  * Status machine: draft_created -> under_review -> doctor_approved
@@ -93,7 +94,14 @@ async function reviewAndStageFinal(prescriptionId, { finalMedicines, finalAdvice
   prescription.finalMedicines = finalMedicines;
   prescription.finalAdvice = finalAdvice;
   prescription.diagnosis = diagnosis;
+
+  const followUpDateChanged = String(prescription.followUpDate || '') !== String(followUpDate || '');
   prescription.followUpDate = followUpDate;
+  if (followUpDateChanged) {
+    prescription.followUpStatus = followUpDate ? 'pending' : undefined;
+    prescription.followUpReminderSentAt = undefined;
+  }
+
   prescription.status = 'under_review';
 
   appendAudit(prescription, 'doctor_modified', actor, { changesSummary }, ipAddress);
@@ -373,58 +381,64 @@ async function generatePrescriptionPdf(identifier) {
 }
 
 /**
- * SRS Module 8 — Follow-up Management.
- * Returns prescriptions whose follow-up needs action: anything with a
- * followUpDate set and status not yet 'completed'. Auto-flips overdue
- * pending/scheduled follow-ups to 'missed' before returning the list,
- * so the worklist is always accurate without a separate cron job.
+ * SRS Module 9 — Follow-up Management (staff worklist).
  */
-async function getFollowUpWorklist({ doctorId, status } = {}) {
-  const now = new Date();
+async function getFollowUpWorklist({ doctorId, status, from, to } = {}) {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
 
-  // Auto-mark overdue, unactioned follow-ups as missed
   await Prescription.updateMany(
-    {
-      followUpDate: { $lt: now },
-      followUpStatus: { $in: ['pending', 'scheduled'] },
-    },
+    { followUpDate: { $lt: todayStart }, followUpStatus: 'pending' },
     { $set: { followUpStatus: 'missed' } }
   );
 
-  const query = {
-    followUpDate: { $ne: null },
-    followUpStatus: { $ne: 'none' },
-  };
-  if (doctorId) query.doctor = doctorId;
-  if (status) query.followUpStatus = status;
+  const match = { followUpDate: { $ne: null, $exists: true } };
+  if (doctorId) match.doctor = doctorId;
 
-  return Prescription.find(query)
-    .populate('patient')
-    .populate('doctor')
-    .select('-aiRecommendation -consultationNotes -auditTrail')
+  if (status && status !== 'all') {
+    match.followUpStatus = status;
+  } else if (!status) {
+    match.followUpStatus = { $ne: 'completed' };
+  }
+
+  if (from || to) {
+    match.followUpDate = { ...match.followUpDate };
+    if (from) match.followUpDate.$gte = new Date(from);
+    if (to) match.followUpDate.$lte = new Date(to);
+  }
+
+  return Prescription.find(match)
+    .populate({ path: 'patient', populate: { path: 'user', select: 'fullName mobileNumber email' } })
+    .populate({ path: 'doctor', populate: { path: 'user', select: 'fullName' } })
+    .select('patient doctor followUpDate followUpStatus followUpAppointment diagnosis finalAdvice.followUpInstructions prescriptionNumber createdAt')
     .sort({ followUpDate: 1 });
 }
 
 /**
- * SRS Module 8 — updates a prescription's follow-up status (e.g. mark
- * scheduled once a visit is booked, or mark completed after the visit).
- * Optionally links the newly booked Appointment via appointmentId.
+ * SRS Module 9 — mark a follow-up as scheduled/completed/missed.
  */
-async function updateFollowUpStatus(prescriptionId, { followUpStatus, appointmentId }, actor, ipAddress) {
+async function updateFollowUpStatus(prescriptionId, { followUpStatus, followUpAppointmentId }, actor, ipAddress) {
   const prescription = await Prescription.findById(prescriptionId);
   if (!prescription) throw new Error('Prescription not found');
+  if (!prescription.followUpDate) throw new Error('This prescription has no follow-up date set.');
 
   const allowed = ['pending', 'scheduled', 'completed', 'missed'];
   if (!allowed.includes(followUpStatus)) {
-    throw new Error('Invalid followUpStatus value.');
+    throw new Error(`Invalid followUpStatus. Must be one of: ${allowed.join(', ')}`);
   }
 
   prescription.followUpStatus = followUpStatus;
-  if (appointmentId) {
-    prescription.followUpAppointment = appointmentId;
+  if (followUpAppointmentId) {
+    prescription.followUpAppointment = followUpAppointmentId;
   }
 
-  appendAudit(prescription, 'followup_status_updated', actor, { followUpStatus, appointmentId }, ipAddress);
+  appendAudit(
+    prescription,
+    'followup_status_changed',
+    actor,
+    { followUpStatusChangedTo: followUpStatus, followUpAppointmentId: followUpAppointmentId || undefined },
+    ipAddress
+  );
   await prescription.save();
   return prescription;
 }
