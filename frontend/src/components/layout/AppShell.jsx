@@ -1,68 +1,83 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
-import { AuthProvider } from './context/AuthContext';
-import ProtectedRoute from './components/common/ProtectedRoute';
-import AppShell from './components/layout/AppShell';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import './AppShell.css';
 
-import LoginPage from './pages/auth/LoginPage';
-import RegisterPage from './pages/auth/RegisterPage';
+const NAV_BY_ROLE = {
+  patient: [
+    { to: '/patient/book', label: 'Book Appointment' },
+    { to: '/patient/appointments', label: 'My Appointments' },
+    { to: '/patient/prescriptions', label: 'My Prescriptions' },
+  ],
+  receptionist: [
+    { to: '/receptionist/queue', label: "Today's Queue" },
+    { to: '/receptionist/book', label: 'Register Walk-in' },
+    { to: '/receptionist/followups', label: 'Follow-ups' },
+  ],
+  doctor: [
+    { to: '/doctor/queue', label: 'My Patients Today' },
+    { to: '/doctor/consultations', label: 'Consultations' },
+    { to: '/doctor/followups', label: 'Follow-ups' },
+  ],
+  pharmacist: [
+    { to: '/pharmacist/prescriptions', label: 'Verify Prescriptions' },
+    { to: '/pharmacist/inventory', label: 'Manage Inventory' },
+  ],
+  admin: [
+    { to: '/admin/overview', label: 'Hospital Overview' },
+    { to: '/admin/reports', label: 'Reporting & Analytics' },
+    { to: '/admin/followups', label: 'Follow-ups' },
+  ],
+};
 
-import BookAppointmentPage from './pages/patient/BookAppointmentPage';
-import MyAppointmentsPage from './pages/patient/MyAppointmentsPage';
-import MyPrescriptionsPage from './pages/patient/MyPrescriptionsPage';
+const ROLE_LABEL = {
+  patient: 'Patient',
+  receptionist: 'Front Desk',
+  doctor: 'Doctor',
+  pharmacist: 'Pharmacist',
+  admin: 'Administrator',
+};
 
-import ReceptionQueuePage from './pages/receptionist/ReceptionQueuePage';
-import RegisterWalkInPage from './pages/receptionist/RegisterWalkInPage';
+export default function AppShell() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const navItems = NAV_BY_ROLE[user?.role] || [];
 
-import DoctorQueuePage from './pages/doctor/DoctorQueuePage';
-import ConsultationPage from './pages/doctor/ConsultationPage';
+  function handleLogout() {
+    logout();
+    navigate('/login');
+  }
 
-import VerifyPrescriptionPage from './pages/pharmacist/VerifyPrescriptionPage';
-import InventoryPage from './pages/pharmacist/InventoryPage';
-import AdminOverviewPage from './pages/admin/AdminOverviewPage';
-import AdminReportsPage from './pages/admin/AdminReportsPage';
-import FollowUpsPage from './pages/shared/FollowUpsPage';
-
-export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Toaster position="top-right" />
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-
-          <Route
-            element={
-              <ProtectedRoute allowedRoles={['patient', 'receptionist', 'doctor', 'pharmacist', 'admin']}>
-                <AppShell />
-              </ProtectedRoute>
-            }
-          >
-            <Route path="/patient/book" element={<BookAppointmentPage />} />
-            <Route path="/patient/appointments" element={<MyAppointmentsPage />} />
-            <Route path="/patient/prescriptions" element={<MyPrescriptionsPage />} />
-
-            <Route path="/receptionist/queue" element={<ReceptionQueuePage />} />
-            <Route path="/receptionist/book" element={<RegisterWalkInPage />} />
-            <Route path="/receptionist/followups" element={<FollowUpsPage />} />
-
-            <Route path="/doctor/queue" element={<DoctorQueuePage />} />
-            <Route path="/doctor/consultations" element={<ConsultationPage />} />
-            <Route path="/doctor/followups" element={<FollowUpsPage />} />
-
-            <Route path="/pharmacist/prescriptions" element={<VerifyPrescriptionPage />} />
-            <Route path="/pharmacist/inventory" element={<InventoryPage />} />
-
-            <Route path="/admin/overview" element={<AdminOverviewPage />} />
-            <Route path="/admin/reports" element={<AdminReportsPage />} />
-            <Route path="/admin/followups" element={<FollowUpsPage />} />
-          </Route>
-
-          <Route path="/" element={<Navigate to="/login" replace />} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+    <div className="shell">
+      <aside className="shell__sidebar">
+        <div className="shell__brand">
+          <span className="shell__brand-mark">+</span>
+          <span className="shell__brand-name">MediFlow</span>
+        </div>
+        <nav className="shell__nav">
+          {navItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) => `shell__nav-link${isActive ? ' shell__nav-link--active' : ''}`}
+            >
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
+        <div className="shell__user">
+          <div className="shell__user-info">
+            <span className="shell__user-name">{user?.fullName}</span>
+            <span className="shell__user-role">{ROLE_LABEL[user?.role]}</span>
+          </div>
+          <button className="shell__logout" onClick={handleLogout}>
+            Sign out
+          </button>
+        </div>
+      </aside>
+      <main className="shell__content">
+        <Outlet />
+      </main>
+    </div>
   );
 }
