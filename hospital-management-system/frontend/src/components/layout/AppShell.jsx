@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+﻿import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import './AppShell.css';
 
@@ -16,6 +16,7 @@ const NAV_BY_ROLE = {
   doctor: [
     { to: '/doctor/queue', label: 'My Patients Today' },
     { to: '/doctor/consultations', label: 'Consultations' },
+    { to: '/doctor/ai-clinical', label: 'AI Clinical Dashboard' },
     { to: '/doctor/followups', label: 'Follow-ups' },
   ],
   pharmacist: [
