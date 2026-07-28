@@ -38,7 +38,11 @@ router.get('/followups', authorize('followup:manage'), ctrl.listFollowUps);
 router.get('/:id', ctrl.getOne);
 
 // SRS Module 9 — mark a follow-up as scheduled/completed/missed.
+// SRS Module 9 — update follow-up status
 router.patch('/:id/followup-status', authorize('followup:manage'), ctrl.updateFollowUpStatus);
+
+// Role-aware fetch
+router.get('/:id', ctrl.getOne);
 
 // SRS Module 2.1 — Patient permission: Download Reports (PDF)
 router.get('/:id/pdf', ctrl.downloadPdf);

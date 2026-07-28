@@ -234,7 +234,77 @@ async function getMyPrescriptions(patientUserId) {
  * Renders the doctor-approved prescription as a PDF buffer. Only ever
  * built from toPatientView() data, so the AI block / consultation notes /
  * audit trail can never leak into a downloadable file.
+ *//**
+ * SRS Module 7 — Follow-up Management
+ * Doctor/Admin can view upcoming follow-ups.
  */
+async function getFollowUpWorklist(filters = {}) {
+  const query = {
+    followUpDate: { $exists: true, $ne: null },
+  };
+
+  if (filters.status) {
+    query.followUpStatus = filters.status;
+  }
+
+  if (filters.doctorId) {
+    query.doctor = filters.doctorId;
+  }
+
+  return Prescription.find(query)
+    .populate('patient')
+    .populate('doctor')
+    .sort({ followUpDate: 1 });
+}
+
+
+/**
+ * Update follow-up status
+ * pending -> completed / cancelled / rescheduled
+ */
+async function updateFollowUpStatus(
+  prescriptionId,
+  { followUpStatus, followUpAppointmentId },
+  actor,
+  ipAddress
+) {
+
+  const prescription = await Prescription.findById(prescriptionId);
+
+  if (!prescription) {
+    throw new Error('Prescription not found');
+  }
+
+  const allowedStatus = [
+  'pending',
+  'scheduled',
+  'completed',
+  'missed'
+  ];
+
+  if (!allowedStatus.includes(followUpStatus)) {
+    throw new Error('Invalid follow-up status');
+  }
+
+
+  prescription.followUpStatus = status;
+
+
+  appendAudit(
+    prescription,
+    'followup_status_updated',
+    actor,
+    {
+      newStatus: status
+    },
+    ipAddress
+  );
+
+
+  await prescription.save();
+
+  return prescription;
+}
 async function generatePrescriptionPdf(identifier) {
   const prescription = await findByIdOrPrescriptionNumber(identifier);
   if (!prescription) return null;
@@ -318,4 +388,6 @@ module.exports = {
   getMyPrescriptions,
   generatePrescriptionPdf,
   getPreviousPrescriptionsForPatient,
+ getFollowUpWorklist,
+  updateFollowUpStatus,
 };
