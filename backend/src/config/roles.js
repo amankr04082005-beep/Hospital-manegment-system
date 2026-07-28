@@ -1,4 +1,4 @@
-// Role-Based Access Control definitions — mirrors SRS Section 2 (User Roles)
+﻿// Role-Based Access Control definitions - mirrors SRS Section 2 (User Roles)
 
 const ROLES = {
   PATIENT: 'patient',
@@ -8,8 +8,6 @@ const ROLES = {
   ADMIN: 'admin',
 };
 
-// SRS Rule 6: Only authorized doctors can approve prescriptions.
-// Receptionists, Nurses, Pharmacists, and Patients cannot approve prescriptions.
 const PERMISSIONS = {
   [ROLES.PATIENT]: [
     'appointment:create',
@@ -20,12 +18,13 @@ const PERMISSIONS = {
   ],
   [ROLES.RECEPTIONIST]: [
     'appointment:view-all',
-    'appointment:create', // used for walk-in registration on behalf of a patient
+    'appointment:create',
     'appointment:register-walkin',
     'appointment:assign-doctor',
     'appointment:forward',
     'appointment:reschedule',
     'queue:manage',
+    'followup:manage',
   ],
   [ROLES.DOCTOR]: [
     'appointment:view-all',
@@ -35,9 +34,10 @@ const PERMISSIONS = {
     'prescription:generate',
     'ai-suggestion:use',
     'ai-suggestion:modify',
-    'prescription:approve', // exclusive approval right
+    'prescription:approve',
     'diagnosis:record',
     'followup:add-advice',
+    'followup:manage',
   ],
   [ROLES.PHARMACIST]: [
     'prescription:view',
@@ -52,6 +52,7 @@ const PERMISSIONS = {
     'report:view-all',
     'audit:view',
     'system:configure',
+    'followup:manage',
   ],
 };
 

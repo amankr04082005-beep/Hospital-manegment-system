@@ -1,5 +1,5 @@
 // Role-Based Access Control definitions — mirrors SRS Section 2 (User Roles)
-console.log('=== ROLES FILE LOADED FROM:', __filename);
+
 const ROLES = {
   PATIENT: 'patient',
   RECEPTIONIST: 'receptionist',
@@ -20,7 +20,7 @@ const PERMISSIONS = {
   ],
   [ROLES.RECEPTIONIST]: [
     'appointment:view-all',
-    'appointment:create', // used for walk-in registration on behalf of a patient
+    'appointment:create',
     'appointment:register-walkin',
     'appointment:assign-doctor',
     'appointment:forward',
@@ -36,7 +36,7 @@ const PERMISSIONS = {
     'prescription:generate',
     'ai-suggestion:use',
     'ai-suggestion:modify',
-    'prescription:approve', // exclusive approval right
+    'prescription:approve',
     'diagnosis:record',
     'followup:add-advice',
     'followup:manage',
@@ -57,8 +57,5 @@ const PERMISSIONS = {
     'followup:manage',
   ],
 };
-console.log('>>> DOCTOR PERMISSIONS AT RUNTIME:', PERMISSIONS[ROLES.DOCTOR]);
-console.log('>>> RECEPTIONIST PERMISSIONS AT RUNTIME:', PERMISSIONS[ROLES.RECEPTIONIST]);
-console.log('>>> PHARMACIST PERMISSIONS AT RUNTIME:', PERMISSIONS[ROLES.PHARMACIST]);
-console.log('>>> ADMIN PERMISSIONS AT RUNTIME:', PERMISSIONS[ROLES.ADMIN]);
+
 module.exports = { ROLES, PERMISSIONS };

@@ -13,6 +13,8 @@ function authorize(...requiredPermissions) {
     const hasAll = requiredPermissions.every((p) => userPermissions.includes(p));
 
     if (!hasAll) {
+      console.log('DEBUG userPermissions for role', req.user.role, ':', userPermissions);
+      console.log('DEBUG requiredPermissions:', requiredPermissions);
       return res.status(403).json({
         success: false,
         message: `Forbidden: role '${req.user.role}' lacks required permission(s): ${requiredPermissions.join(', ')}`,
