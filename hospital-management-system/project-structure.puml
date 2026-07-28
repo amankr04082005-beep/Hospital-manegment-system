@@ -1,0 +1,113 @@
+@startuml
+title MediFlow - Hospital Management System Project Structure
+
+package "Frontend (React + Vite)" {
+
+  package "src" {
+
+    package "components" {
+      [Common Components]
+      [Layout]
+      [Forms]
+      [Cards]
+    }
+
+    package "pages" {
+      [Login]
+      [Dashboard]
+      [Appointments]
+      [Consultation]
+      [EMR]
+      [Prescriptions]
+      [FollowUps]
+      [Reports]
+    }
+
+    package "services" {
+      [auth.service.js]
+      [appointment.service.js]
+      [patient.service.js]
+      [prescription.service.js]
+      [report.service.js]
+    }
+
+    package "context" {
+      [AuthContext]
+    }
+
+    package "routes" {
+      [Protected Routes]
+    }
+  }
+}
+
+package "Backend (Node.js + Express)" {
+
+  package "src" {
+
+    package "controllers" {
+      [Auth Controller]
+      [Appointment Controller]
+      [Patient Controller]
+      [Consultation Controller]
+      [Prescription Controller]
+      [Report Controller]
+    }
+
+    package "routes" {
+      [Auth Routes]
+      [Appointment Routes]
+      [Patient Routes]
+      [Consultation Routes]
+      [Prescription Routes]
+      [Report Routes]
+    }
+
+    package "services" {
+      [AI Service]
+      [Prescription Service]
+      [Report Service]
+      [Drug Service]
+    }
+
+    package "models" {
+      [User]
+      [Doctor]
+      [Patient]
+      [Appointment]
+      [Prescription]
+      [Medical Record]
+      [Medicine]
+    }
+
+    package "middleware" {
+      [Authentication]
+      [Authorization]
+      [Validation]
+    }
+
+    package "config" {
+      [Database]
+      [Environment]
+    }
+  }
+}
+
+database "MongoDB" {
+    [Collections]
+}
+
+cloud "OpenAI API" {
+    [AI Prescription Suggestions]
+}
+
+cloud "OpenFDA API" {
+    [Drug Information]
+}
+
+Frontend --> Backend : REST API
+Backend --> MongoDB : Mongoose
+Backend --> "OpenAI API"
+Backend --> "OpenFDA API"
+
+@enduml

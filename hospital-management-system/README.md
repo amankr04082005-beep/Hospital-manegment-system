@@ -1,101 +1,299 @@
-# MediFlow — Hospital Appointment & AI-Assisted Consultation Management System
+# 🏥 MediFlow – Hospital Appointment & AI-Assisted Consultation Management System
 
-Built from the provided SRS. Full module structure is scaffolded; **Modules 1, 2, 3 (partial), 5, and 6** are fully implemented end-to-end (backend + frontend). Other modules have working route/data structure stubs so the project can grow into them.
+A full-stack Hospital Management System designed to streamline hospital operations, patient appointments, doctor consultations, Electronic Medical Records (EMR), AI-assisted prescription generation, follow-up management, and reporting & analytics.
 
-## What's fully working
+---
 
-| SRS Module | Status | Where |
-|---|---|---|
-| 1. Patient Appointment Booking | ✅ Full | `backend/src/controllers/appointment.controller.js`, `frontend/src/pages/patient/BookAppointmentPage.jsx` |
-| 2. Appointment Management (queue, forward, reschedule) | ✅ Full | same controller, `frontend/src/pages/receptionist/*` |
-| 3. EMR | ⚙️ Basic CRUD | `backend/src/routes/emr.routes.js` |
-| 4. Doctor Consultation | ✅ Full | `frontend/src/pages/doctor/*` |
-| 5. AI-Assisted Clinical Decision Support | ✅ Full, compliance-enforced | see below |
-| 6. Medicine Composition Engine | ✅ Full | `backend/src/services/aiClinicalDecisionSupport.service.js`, `backend/src/models/Medicine.js` |
-| 7. Prescription Generation (PDF/QR) | ✅ QR + record; PDF generation hook present (pdfkit installed, not wired to a template yet) | `backend/src/services/prescription.service.js` |
-| 8. Follow-up Management | ⚙️ Data field only (`followUpDate`) | — |
-| 9. Reporting & Analytics | 🧱 Structure only, not implemented | — |
-| 10. Notifications (SMS/Email) | 🧱 Twilio/SMTP config present, dispatch not wired | `.env.example` |
+# 📌 Features
 
-## Module 5 — how the compliance rules are actually enforced (not just documented)
+## 👤 Patient
+- Patient Registration & Login
+- Book Hospital Appointments
+- View Appointment History
+- View Prescriptions
+- View Follow-up Details
 
-This was the most important part of the SRS, so it's enforced in code, not just described:
+## 👨‍⚕️ Doctor
+- Manage Appointments
+- Conduct Patient Consultations
+- Access Electronic Medical Records (EMR)
+- Generate AI-Assisted Prescription Suggestions
+- Approve Prescriptions
+- Generate Prescription PDF
+- Schedule Patient Follow-ups
 
-- **Rule 1** (`AI Suggested - Pending Doctor Approval` label) — hardcoded, immutable field in `Prescription.aiRecommendation.label` (`backend/src/models/Prescription.js`).
-- **Rule 2** (patients never see AI suggestions) — `Prescription.toPatientView()` strips `aiRecommendation` and `auditTrail` entirely; `prescriptionService.getForPatient()` is the *only* path patients can hit, and it returns `null` until the prescription is approved.
-- **Rule 3** (no PDF/number without approval) — `generatePrescriptionArtifacts()` throws if `status !== 'doctor_approved'`.
-- **Rule 4** (approved prescription must carry doctor name, registration number, timestamp, signature) — all four fields are required on `Prescription.approval` and populated from the `Doctor` record at approval time.
-- **Rule 5** (audit trail) — every mutation (`ai_suggestion_generated`, `doctor_modified`, `prescription_approved`, `prescription_generated`, `prescription_shared`) appends an entry to `auditTrail`, including actor, role, IP, and timestamp.
-- **Rule 6** (only doctors approve) — `approvePrescription()` checks `actor.role === 'doctor'` *and* that a matching `Doctor` profile exists *and* that the prescription is assigned to that doctor — independent of route middleware, so it's safe even if called directly.
+## 🏥 Administrator
+- Manage Doctors
+- Manage Patients
+- Monitor Appointments
+- Reporting & Analytics Dashboard
+- Revenue Tracking
+- Doctor Performance Analysis
 
-The frontend visualizes this with two distinct badges: an amber dashed **"AI Suggested — Pending Doctor Approval"** tag vs. a solid teal **"Doctor Approved"** stamp, so the draft/final distinction is visible at a glance in the consultation screen.
+---
 
-## Project structure
+# 📚 Project Modules
 
+### ✅ Module 1 – Patient Appointment Booking
+- Patient Registration
+- Appointment Booking
+- Appointment Scheduling
+
+### ✅ Module 2 – Hospital Appointment Management
+- Appointment Approval
+- Appointment Status Tracking
+- Doctor Schedule Management
+
+### ✅ Module 3 – Doctor Consultation Workflow
+- Consultation Management
+- Diagnosis Recording
+- Treatment Planning
+
+### ✅ Module 4 – Electronic Medical Records (EMR)
+- Medical History
+- Patient Vitals
+- Diagnoses
+- Previous Prescriptions
+
+### ✅ Module 5 – AI-Assisted Clinical Decision Support
+- AI Prescription Suggestions
+- Doctor Approval Workflow
+- Prescription PDF Generation
+- Audit Logging
+
+### ✅ Module 6 – Drug Database Integration
+- Local Medicine Database
+- Medicine Recommendation
+- OpenFDA Integration
+
+### ✅ Module 7 – Follow-up & Patient Advice Management
+- Follow-up Scheduling
+- Patient Advice
+- Follow-up Status Tracking
+
+### ✅ Module 8 – Reporting & Analytics
+- Appointment Reports
+- Revenue Reports
+- Disease Trends
+- Most Prescribed Medicines
+- Doctor Performance
+
+---
+
+# 🛠 Technology Stack
+
+## Frontend
+- React.js
+- Vite
+- React Router
+- Axios
+- Tailwind CSS
+
+## Backend
+- Node.js
+- Express.js
+
+## Database
+- MongoDB
+- Mongoose
+
+## AI Integration
+- OpenAI API
+
+## Other Libraries
+- JWT Authentication
+- PDFKit
+- QRCode
+- Nodemailer
+
+---
+
+# 📁 Project Structure
+
+```text
+Hospital-manegment-system
+│
+├── backend
+│   ├── src
+│   │   ├── config
+│   │   ├── controllers
+│   │   ├── middleware
+│   │   ├── models
+│   │   ├── routes
+│   │   ├── services
+│   │   ├── utils
+│   │   └── server.js
+│   │
+│   ├── uploads
+│   ├── package.json
+│   └── .env
+│
+├── frontend
+│   ├── public
+│   ├── src
+│   │   ├── components
+│   │   ├── context
+│   │   ├── layouts
+│   │   ├── pages
+│   │   ├── routes
+│   │   ├── services
+│   │   ├── utils
+│   │   ├── App.jsx
+│   │   └── main.jsx
+│   │
+│   ├── package.json
+│   └── vite.config.js
+│
+├── docs
+│   └── uml
+│       ├── project-structure.puml
+│       ├── use-case.puml
+│       ├── class-diagram.puml
+│       ├── sequence-diagram.puml
+│       ├── deployment-diagram.puml
+│       └── er-diagram.puml
+│
+├── README.md
+└── .gitignore
 ```
-hospital-management-system/
-├── backend/                  Node.js + Express + MongoDB API
-│   └── src/
-│       ├── config/           DB connection, RBAC permission map
-│       ├── models/            Mongoose schemas (User, Patient, Doctor, Appointment, Prescription, Medicine, EMR...)
-│       ├── controllers/       Request handlers
-│       ├── services/          Business logic — AI CDSS service + prescription workflow service
-│       ├── middleware/        JWT auth, RBAC, validation, error handling
-│       ├── routes/            Express routers per module
-│       └── utils/seedData.js  Demo data (users, branch, department, medicines)
-└── frontend/                  React (Vite) web portal
-    └── src/
-        ├── pages/             Role-specific screens (patient, doctor, receptionist, pharmacist, admin, auth)
-        ├── components/        Layout shell, badges, shared UI primitives
-        ├── context/           Auth context (JWT in localStorage)
-        ├── services/          Axios API clients
-        └── styles/            Design tokens (globals.css)
+
+---
+
+# ⚙ Installation
+
+## Clone Repository
+
+```bash
+git clone https://github.com/amankr04082005-beep/Hospital-manegment-system.git
+cd Hospital-manegment-system
 ```
 
-## Running it locally
+---
 
-### 1. Backend
+## Backend Setup
 
 ```bash
 cd backend
 npm install
-cp .env.example .env
-# edit .env: set MONGO_URI, JWT_SECRET, and (optionally) OPENAI_API_KEY for real AI suggestions
-npm run seed     # creates demo branch/department/doctor/patient/medicines
-npm run dev      # starts on http://localhost:5000
+npm start
 ```
 
-Without `OPENAI_API_KEY` set, the AI suggestion endpoint still works — it returns a placeholder recommendation so you can exercise the full doctor-review → approve → share workflow without an API key.
+Backend runs on:
 
-### 2. Frontend
+```
+http://localhost:3001
+```
+
+---
+
+## Frontend Setup
 
 ```bash
 cd frontend
 npm install
-npm run dev      # starts on http://localhost:3000, proxies /api to localhost:5000
+npm run dev
 ```
 
-### 3. Demo logins (after `npm run seed`)
+Frontend runs on:
 
-| Role | Email | Password |
-|---|---|---|
-| Admin | admin@hospital.com | Admin@1234 |
-| Doctor | doctor@hospital.com | Doctor@1234 |
-| Receptionist | reception@hospital.com | Reception@1234 |
-| Pharmacist | pharmacist@hospital.com | Pharmacist@1234 |
-| Patient | patient@hospital.com | Patient@1234 |
+```
+http://localhost:5173
+```
 
-### Try the core flow
+---
 
-1. Log in as the **patient**, book an appointment with Dr. Anjali Rao.
-2. Log in as **reception**, see it on today's queue, click "Forward to doctor."
-3. Log in as the **doctor**, open "My patients today" → "Start consultation," enter symptoms, click "Generate AI clinical suggestion."
-4. Review/edit the AI-suggested medicines, save the review, then click **Approve prescription** — note the badge switches from amber "AI Suggested" to teal "Doctor Approved."
-5. Click "Generate & share with patient."
-6. Log back in as the **patient**, go to "My Prescriptions," paste the prescription ID (visible in the doctor's network response / Mongo `_id`) to see the patient-facing view — confirm the raw AI suggestion block is never present there.
+# 🔐 Environment Variables
 
-## Notes
+Create a `.env` file inside the backend folder.
 
-- `node_modules` and `.env` are intentionally excluded from this zip — run `npm install` in each folder.
-- The medicine catalog seeded includes the SRS's own example (Dolo 650 / Crocin 650 / Calpol 650, all Paracetamol 650mg) plus a penicillin-based antibiotic to demonstrate the allergy-alert path.
-- This is a working scaffold meant to be extended, not a production-hardened deployment — review auth/session settings, add rate limiting tuned to your traffic, and wire real SMS/email providers before going live.
+```env
+PORT=3001
+
+MONGODB_URI=your_mongodb_connection_string
+
+JWT_SECRET=your_secret_key
+
+OPENAI_API_KEY=your_openai_api_key
+```
+
+---
+
+# 📊 Reporting & Analytics
+
+The dashboard provides:
+
+- Total Appointments
+- Appointment Status Summary
+- Revenue Overview
+- Prescription Statistics
+- Disease Trends
+- Most Prescribed Medicines
+- Doctor Performance
+
+---
+
+# 📱 Responsive Design
+
+The application is fully responsive and optimized for:
+
+- Desktop
+- Laptop
+- Tablet
+- Android Devices
+- iPhone Devices
+
+---
+
+# 🔒 Security Features
+
+- JWT Authentication
+- Password Hashing
+- Protected Routes
+- Role-Based Authorization
+- Secure REST APIs
+- AI Suggestions Require Doctor Approval
+
+---
+
+# 🚀 Future Enhancements
+
+- Video Consultation
+- SMS Notifications
+- Payment Gateway Integration
+- Multi-Hospital Support
+- AI Disease Prediction
+
+---
+
+# 📸 Screenshots
+
+```
+screenshots/
+├── login.png
+├── dashboard.png
+├── consultation.png
+├── prescription.png
+├── followup.png
+└── reports.png
+```
+
+(Add screenshots after deployment.)
+
+---
+
+# 👨‍💻 Developer
+
+**Aman Kumar**
+
+**BCA Graduate**
+
+GitHub:
+https://github.com/amankr04082005-beep
+
+---
+
+# ⭐ If you found this project useful, don't forget to give it a star.
+
+# 📄 License
+
+This project is developed for educational and demonstration purposes.
