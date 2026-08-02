@@ -1,7 +1,7 @@
 Doctor Prescription
 
 Date: 2026-08-02
-Patient Name: Unknown
+Patient Name: John Doe
 Age / Sex: 45
 Diagnosis: Diagnosis: Acute bronchitis likely viral; secondary bacterial infection possible.
 
@@ -12,6 +12,6 @@ Instructions:
 
 
 Additional Notes:
-John Doe Male Cough and fever for 3 days. Patient reports productive cough with yellow sputum. Diagnosis: Acute bronchitis likely viral; secondary bacterial infection possible.
+Male Cough and fever for 3 days. Patient reports productive cough with yellow sputum. Diagnosis: Acute bronchitis likely viral; secondary bacterial infection possible.
 
-Prescribing Doctor: Dr. [Not specified]
+Prescribing Doctor: Dr. Anjali Rao
