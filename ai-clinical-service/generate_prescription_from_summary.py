@@ -21,6 +21,7 @@ This is intended as a lightweight helper to automate steps 2-4 requested by the 
 """
 
 from __future__ import annotations
+import argparse
 import json
 import os
 import re
@@ -211,9 +212,59 @@ def fill_template(template_text: str, fields: dict) -> str:
     return out
 
 
+def parse_args(argv: list[str] | None = None):
+    parser = argparse.ArgumentParser(
+        description="Generate prescription output from a meeting transcript using Gemini summarization."
+    )
+    parser.add_argument(
+        "transcript",
+        nargs="?",
+        default=str(DEFAULT_TRANSCRIPT),
+        help="Path to the transcript file",
+    )
+    parser.add_argument(
+        "--gemini-key",
+        dest="gemini_key",
+        default=None,
+        help="Gemini API key to use for summarization",
+    )
+    parser.add_argument(
+        "--gemini-model",
+        dest="gemini_model",
+        default=None,
+        help="Gemini model to use (default: gemini-3.1-flash-lite)",
+    )
+    parser.add_argument(
+        "--show-summary",
+        action="store_true",
+        help="Print the generated summary after writing it",
+    )
+    parser.add_argument(
+        "--show-prescription",
+        action="store_true",
+        help="Print the filled prescription output after writing it",
+    )
+    return parser.parse_args(argv)
+
+
 def main(argv: list[str] | None = None):
-    argv = argv or sys.argv[1:]
-    transcript_path = Path(argv[0]) if argv else DEFAULT_TRANSCRIPT
+    args = parse_args(argv)
+    transcript_path = Path(args.transcript)
+
+    if args.gemini_key:
+        os.environ["GEMINI_API_KEY"] = args.gemini_key
+    if args.gemini_model:
+        os.environ["GEMINI_MODEL"] = args.gemini_model
+
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if api_key:
+        print("Using Gemini summarization with GEMINI_API_KEY.")
+        if args.gemini_model:
+            print(f"Using Gemini model: {args.gemini_model}")
+        else:
+            print(f"Using Gemini model: {os.environ.get('GEMINI_MODEL', 'gemini-3.1-flash-lite')}")
+    else:
+        print("No GEMINI_API_KEY found; using local fallback summarizer.")
 
     if not transcript_path.exists():
         print(f"Transcript file not found: {transcript_path}")
@@ -256,6 +307,15 @@ Prescribing Doctor: {{doctor_name}}
 
     OUTPUT_FILE.write_text(filled, encoding="utf-8")
     print(f"Wrote filled prescription to {OUTPUT_FILE}")
+
+    if args.show_summary:
+        print("\nGenerated Summary:\n")
+        print(summary_text)
+
+    if args.show_prescription:
+        print("\nGenerated Prescription Output:\n")
+        print(filled)
+
     return 0
 
 
