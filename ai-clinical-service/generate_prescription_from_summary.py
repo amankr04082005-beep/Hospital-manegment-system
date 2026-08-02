@@ -72,7 +72,7 @@ def parse_summary_for_fields(summary: str) -> dict:
         if m:
             key = m.group("k").strip().lower()
             val = m.group("v").strip()
-            if "patient" in key and not fields["patient_name"]:
+            if "patient" in key and fields["patient_name"] == "Unknown":
                 fields["patient_name"] = val
             elif key in ("age", "age/sex", "age / sex"):
                 fields["age_sex"] = val
