@@ -7,6 +7,10 @@ Simple utility to:
   5) Write the filled prescription to prescription_output.txt
 
 Place the transcript file next to this script or pass its path as an argument.
+This script uses a Gemini API call for summarization when the GEMINI_API_KEY
+environment variable is set. When no key is configured, it falls back to a
+simple local summarizer.
+
 This script uses very simple heuristics to extract fields from the summary: it
 recognizes lines containing key: value pairs (e.g. "Patient: John Doe"), or
 common keywords (Patient, Age, Diagnosis, Medications, Doctor). If such keys
@@ -17,10 +21,14 @@ This is intended as a lightweight helper to automate steps 2-4 requested by the 
 """
 
 from __future__ import annotations
+import json
+import os
 import re
 import sys
 from datetime import datetime
 from pathlib import Path
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 SCRIPT_DIR = Path(__file__).parent
 DEFAULT_TRANSCRIPT = SCRIPT_DIR / "transcript.txt"
@@ -29,7 +37,66 @@ TEMPLATE_FILE = SCRIPT_DIR / "doctor_prescription_template.txt"
 OUTPUT_FILE = SCRIPT_DIR / "prescription_output.txt"
 
 
+def call_gemini_summary(prompt: str, api_key: str, model: str = "gemini-3.1-flash-lite") -> str:
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+    body = {
+        "contents": [
+            {
+                "role": "user",
+                "parts": [{"text": prompt}],
+            }
+        ],
+        "temperature": 0.2,
+        "maxOutputTokens": 512,
+    }
+    request = Request(
+        url,
+        data=json.dumps(body).encode("utf-8"),
+        headers={"Content-Type": "application/json; charset=utf-8"},
+        method="POST",
+    )
+
+    try:
+        with urlopen(request, timeout=30) as response:
+            raw_response = response.read().decode("utf-8")
+            data = json.loads(raw_response)
+    except (HTTPError, URLError, ValueError):
+        return ""
+
+    candidate = None
+    if isinstance(data.get("candidates"), list) and data["candidates"]:
+        candidate = data["candidates"][0]
+    elif isinstance(data.get("output"), dict):
+        candidate = data["output"]
+
+    if not candidate:
+        return ""
+
+    def extract_text(item):
+        if not isinstance(item, dict):
+            return ""
+        if "parts" in item and isinstance(item["parts"], list) and item["parts"]:
+            first_part = item["parts"][0]
+            if isinstance(first_part, dict) and "text" in first_part:
+                return first_part["text"].strip()
+        if "text" in item:
+            return str(item["text"]).strip()
+        if "content" in item:
+            return extract_text(item["content"])
+        return ""
+
+    text = extract_text(candidate.get("content", candidate))
+    return text.strip()
+
+
 def summarize_text(text: str, max_sentences: int = 3) -> str:
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if api_key:
+        prompt = f"Here is the meeting transcript:\n\n{text}\n\nSummarize it in short bullet points."
+        gemini_summary = call_gemini_summary(prompt, api_key, os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite"))
+        if gemini_summary:
+            return gemini_summary
+
     # Very small heuristic summarizer: split into sentences and take first N informative ones
     # Split on .!? keeping them
     sentences = re.split(r'(?<=[.!?])\s+', text.strip())
