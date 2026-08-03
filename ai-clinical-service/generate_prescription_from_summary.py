@@ -38,6 +38,32 @@ TEMPLATE_FILE = SCRIPT_DIR / "doctor_prescription_template.txt"
 OUTPUT_FILE = SCRIPT_DIR / "prescription_output.txt"
 
 
+def load_dotenv(path: Path | str | None = None) -> None:
+    dotenv_path = Path(path or SCRIPT_DIR / ".env")
+    if not dotenv_path.exists():
+        return
+
+    for raw_line in dotenv_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+
+        if not key or key in os.environ:
+            continue
+
+        if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
+            value = value[1:-1]
+
+        os.environ[key] = value
+
+
+load_dotenv()
+
+
 def call_gemini_summary(prompt: str, api_key: str, model: str = "gemini-3.1-flash-lite") -> str:
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
     body = {
