@@ -1,6 +1,6 @@
 Doctor Prescription
 
-Date: 2026-08-02
+Date: 2026-08-03
 Patient Name: John Doe
 Age / Sex: 45
 Diagnosis: Diagnosis: Acute bronchitis likely viral; secondary bacterial infection possible.
