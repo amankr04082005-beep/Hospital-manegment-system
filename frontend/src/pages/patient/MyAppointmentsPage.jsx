@@ -97,7 +97,7 @@ export default function MyAppointmentsPage() {
                 </div>
                 <div style={{ fontWeight: 600 }}>Dr. {apt.doctor?.user?.fullName}</div>
                 <div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
-                  {apt.department?.name} · {format(new Date(apt.appointmentDate), 'PPP')} · {apt.timeSlot}
+                  {apt.department?.name} · {apt.branch?.name ?? 'Branch info not available'} · {format(new Date(apt.appointmentDate), 'PPP')} · {apt.timeSlot}
                 </div>
               </div>
               <StatusPill status={apt.status} />

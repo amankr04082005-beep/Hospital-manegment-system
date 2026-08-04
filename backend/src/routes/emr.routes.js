@@ -7,6 +7,21 @@ const Patient = require('../models/Patient');
 const router = express.Router();
 router.use(authenticate);
 
+// GET /api/emr/me — full medical history for the currently authenticated patient (Module 3)
+router.get('/me', async (req, res, next) => {
+  try {
+    const patient = await Patient.findOne({ user: req.user._id });
+    if (!patient) {
+      return res.status(404).json({ success: false, message: 'Patient profile not found.' });
+    }
+
+    const records = await EmrEntry.find({ patient: patient._id }).sort({ recordDate: -1 });
+    res.json({ success: true, data: { patientProfile: patient, records } });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/emr/:patientId — full medical history (Module 3)
 router.get('/:patientId', async (req, res, next) => {
   try {

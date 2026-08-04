@@ -1,12 +1,17 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import * as notificationService from '../../services/notification.service';
 import './AppShell.css';
+
+const COMMON_NAV = [{ to: '/notifications', label: 'Notifications' }];
 
 const NAV_BY_ROLE = {
   patient: [
     { to: '/patient/book', label: 'Book Appointment' },
     { to: '/patient/appointments', label: 'My Appointments' },
     { to: '/patient/prescriptions', label: 'My Prescriptions' },
+    { to: '/patient/lab-reports', label: 'My Lab Reports' },
   ],
   receptionist: [
     { to: '/receptionist/queue', label: "Today's Queue" },
@@ -40,8 +45,34 @@ const ROLE_LABEL = {
 
 export default function AppShell() {
   const { user, logout } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
   const navigate = useNavigate();
-  const navItems = NAV_BY_ROLE[user?.role] || [];
+
+  useEffect(() => {
+    let mounted = true;
+    if (!user) return;
+
+    async function loadNotifications() {
+      try {
+        const items = await notificationService.getNotifications(20);
+        if (!mounted) return;
+        setUnreadCount(items.filter((item) => !item.isRead).length);
+      } catch {
+        if (mounted) setUnreadCount(0);
+      }
+    }
+
+    loadNotifications();
+    return () => {
+      mounted = false;
+    };
+  }, [user]);
+
+  const baseNav = NAV_BY_ROLE[user?.role] || [];
+  const navItems = [...baseNav, ...COMMON_NAV].map((item) => ({
+    ...item,
+    label: item.to === '/notifications' && unreadCount > 0 ? `${item.label} (${unreadCount})` : item.label,
+  }));
 
   function handleLogout() {
     logout();

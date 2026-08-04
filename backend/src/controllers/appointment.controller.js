@@ -4,6 +4,8 @@ const mongoose = require('mongoose');
 const Appointment = require('../models/Appointment');
 const Patient = require('../models/Patient');
 const Doctor = require('../models/Doctor');
+const { Branch } = require('../models/Branch');
+const notificationService = require('../services/notification.service');
 
 // POST /api/appointments  — SRS Module 1: Appointment Booking
 async function bookAppointment(req, res, next) {
@@ -38,6 +40,9 @@ async function bookAppointment(req, res, next) {
     const appointmentNumber = `APT-${Date.now().toString().slice(-8)}-${uuidv4().slice(0, 4).toUpperCase()}`;
     const qrCodeDataUrl = await QRCode.toDataURL(appointmentNumber);
 
+    const doctor = await Doctor.findById(doctorId).populate('user', 'fullName');
+    const branch = branchId ? await Branch.findById(branchId) : null;
+
     const appointment = await Appointment.create({
       appointmentNumber,
       patient: patient._id,
@@ -52,6 +57,28 @@ async function bookAppointment(req, res, next) {
       isWalkIn: Boolean(isWalkIn),
       status: 'booked',
     });
+
+    if (patient.user) {
+      const patientMessage = `Your appointment at ${branch?.name || 'selected branch'} with Dr. ${doctor?.user?.fullName || 'the selected doctor'} is confirmed for ${new Date(appointmentDate).toLocaleDateString()}.`;
+      notificationService.createNotification({
+        userId: patient.user,
+        type: 'appointment',
+        title: 'Appointment confirmed',
+        message: patientMessage,
+        data: { appointmentId: appointment._id, appointmentNumber },
+      }).catch(() => null);
+    }
+
+    if (doctor?.user?._id) {
+      const doctorMessage = `A new appointment has been booked at ${branch?.name || 'your hospital'} for ${new Date(appointmentDate).toLocaleDateString()}.`;
+      notificationService.createNotification({
+        userId: doctor.user._id,
+        type: 'appointment',
+        title: 'New appointment booked',
+        message: doctorMessage,
+        data: { appointmentId: appointment._id, appointmentNumber },
+      }).catch(() => null);
+    }
 
     res.status(201).json({ success: true, data: appointment });
   } catch (error) {
@@ -96,6 +123,7 @@ async function getMyAppointments(req, res, next) {
     const appointments = await Appointment.find({ patient: patient._id })
       .populate({ path: 'doctor', populate: { path: 'user', select: 'fullName' } })
       .populate('department')
+      .populate('branch')
       .sort({ appointmentDate: -1 });
 
     res.json({ success: true, data: appointments });

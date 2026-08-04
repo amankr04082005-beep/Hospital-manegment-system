@@ -6,6 +6,7 @@ const Prescription = require('../models/Prescription');
 const Patient = require('../models/Patient');
 const Doctor = require('../models/Doctor');
 const Appointment = require('../models/Appointment');
+const notificationService = require('./notification.service');
 const aiService = require('./aiClinicalDecisionSupport.service');
 
 /**
@@ -179,6 +180,18 @@ async function shareWithPatient(prescriptionId, channels, actor, ipAddress) {
     await Appointment.findByIdAndUpdate(prescription.appointment, { status: 'completed' });
   }
 
+  const patient = await Patient.findById(prescription.patient);
+  if (patient?.user) {
+    const sharedMessage = `Your prescription ${prescription.prescriptionNumber || ''} has been shared and is available in the patient portal.`;
+    notificationService.createNotification({
+      userId: patient.user,
+      type: 'prescription',
+      title: 'Prescription shared',
+      message: sharedMessage,
+      data: { prescriptionId: prescription._id, prescriptionNumber: prescription.prescriptionNumber },
+    }).catch(() => null);
+  }
+
   return prescription;
 }
 
@@ -286,16 +299,18 @@ async function updateFollowUpStatus(
     throw new Error('Invalid follow-up status');
   }
 
-
-  prescription.followUpStatus = status;
-
+  prescription.followUpStatus = followUpStatus;
+  if (followUpAppointmentId) {
+    prescription.followUpAppointmentId = followUpAppointmentId;
+  }
 
   appendAudit(
     prescription,
     'followup_status_updated',
     actor,
     {
-      newStatus: status
+      newStatus: followUpStatus,
+      followUpAppointmentId,
     },
     ipAddress
   );

@@ -8,6 +8,11 @@ export async function getPatientHistory(patientId) {
   return data.data; // { patientProfile, records }
 }
 
+export async function getMyHistory() {
+  const { data } = await api.get('/emr/me');
+  return data.data;
+}
+
 // Adds a new EMR record for a patient — e.g. a lab report, scan, or
 // consultation note. recordType must be one of:
 // 'consultation_note' | 'lab_report' | 'xray' | 'mri' | 'ct_scan' | 'other'

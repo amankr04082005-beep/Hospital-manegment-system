@@ -10,6 +10,7 @@ import RegisterPage from './pages/auth/RegisterPage';
 import BookAppointmentPage from './pages/patient/BookAppointmentPage';
 import MyAppointmentsPage from './pages/patient/MyAppointmentsPage';
 import MyPrescriptionsPage from './pages/patient/MyPrescriptionsPage';
+import LabReportsPage from './pages/patient/LabReportsPage';
 
 import ReceptionQueuePage from './pages/receptionist/ReceptionQueuePage';
 import RegisterWalkInPage from './pages/receptionist/RegisterWalkInPage';
@@ -23,6 +24,7 @@ import InventoryPage from './pages/pharmacist/InventoryPage';
 import AdminOverviewPage from './pages/admin/AdminOverviewPage';
 import AdminReportsPage from './pages/admin/AdminReportsPage';
 import FollowUpsPage from './pages/shared/FollowUpsPage';
+import NotificationsPage from './pages/shared/NotificationsPage';
 
 export default function App() {
   return (
@@ -43,6 +45,7 @@ export default function App() {
             <Route path="/patient/book" element={<BookAppointmentPage />} />
             <Route path="/patient/appointments" element={<MyAppointmentsPage />} />
             <Route path="/patient/prescriptions" element={<MyPrescriptionsPage />} />
+            <Route path="/patient/lab-reports" element={<LabReportsPage />} />
 
             <Route path="/receptionist/queue" element={<ReceptionQueuePage />} />
             <Route path="/receptionist/book" element={<RegisterWalkInPage />} />
@@ -59,6 +62,7 @@ export default function App() {
             <Route path="/admin/overview" element={<AdminOverviewPage />} />
             <Route path="/admin/reports" element={<AdminReportsPage />} />
             <Route path="/admin/followups" element={<FollowUpsPage />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
           </Route>
 
           <Route path="/" element={<Navigate to="/login" replace />} />

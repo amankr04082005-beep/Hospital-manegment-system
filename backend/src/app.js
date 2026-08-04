@@ -12,6 +12,7 @@ const medicineRoutes = require('./routes/medicine.routes');
 const emrRoutes = require('./routes/emr.routes');
 const hospitalRoutes = require('./routes/hospital.routes');
 const reportRoutes = require('./routes/report.routes');
+const notificationRoutes = require('./routes/notification.routes');
 const adminRoutes = require('./routes/admin.routes');
 
 const { notFound, errorHandler } = require('./middleware/error.middleware');
@@ -120,6 +121,8 @@ app.use('/api/medicines', medicineRoutes);
 app.use('/api/emr', emrRoutes);
 
 app.use('/api/hospital', hospitalRoutes);
+
+app.use('/api/notifications', notificationRoutes);
 
 // Reporting & Analytics
 app.use('/api/reports', reportRoutes);
