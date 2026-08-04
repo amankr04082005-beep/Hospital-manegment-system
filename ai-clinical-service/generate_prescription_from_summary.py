@@ -13,9 +13,9 @@ simple local summarizer.
 
 This script uses very simple heuristics to extract fields from the summary: it
 recognizes lines containing key: value pairs (e.g. "Patient: John Doe"), or
-common keywords (Patient, Age, Diagnosis, Medications, Doctor). If such keys
-are not present, the script will place the summary into the "notes" field and
-use sensible defaults for other placeholders.
+common keywords (Patient, Age, Diagnosis, Medications, Doctor). It also
+extracts medicines and dosing/instruction text automatically, and Gemini is
+prompted to return explicit Medicines and Instructions fields when available.
 
 This is intended as a lightweight helper to automate steps 2-4 requested by the user.
 """
@@ -140,19 +140,65 @@ def normalize_summary_line(line: str) -> str:
     return line.strip()
 
 
+def extract_medicine_lines(lines: list[str]) -> list[str]:
+    meds: list[str] = []
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        kv_match = re.match(r'^(?:medicine|medicines|medication|treatment|drug|drugs|prescription)\s*[:\-]\s*(.+)$', line, re.IGNORECASE)
+        if kv_match:
+            meds.append(kv_match.group(1).strip())
+            continue
+
+        if re.search(r'\b(?:mg|ml|tablet|tab|tabs|capsule|cap|syrup|drop|drops|ointment|cream|inhaler|puff|spray|injection|inject|dose|tablet[s]?)\b', line, re.IGNORECASE):
+            meds.append(line)
+            continue
+
+        if re.match(r'^(?:take|give|start|continue)\b', line, re.IGNORECASE) and re.search(r'\b(?:tablet|tab|capsule|cap|syrup|mg|ml|drop|puff|spray|injection|ointment)\b', line, re.IGNORECASE):
+            meds.append(line)
+
+    return meds
+
+
+def extract_instruction_lines(lines: list[str]) -> list[str]:
+    instructions: list[str] = []
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        if re.match(r'^(?:instruction|instructions|guidance|direction|directions)\s*[:\-]\s*(.+)$', line, re.IGNORECASE):
+            instructions.append(line)
+            continue
+
+        if re.search(r'\b(take|apply|use|administer|continue|follow up|follow-up|avoid|as needed|prn|before meals|after meals|at bedtime|every \d+ (?:hours|days)|once daily|twice daily|three times daily|daily|nightly|morning|twice a day|three times a day)\b', line, re.IGNORECASE):
+            if not re.match(r'^(?:patient|doctor|diagnosis|medicines?|drugs?)\s*[:\-]', line, re.IGNORECASE):
+                instructions.append(line)
+
+    return instructions
+
+
+def build_gemini_prescription_prompt(text: str) -> str:
+    return (
+        "You are a clinical summarization assistant.\n"
+        "Read the transcript below and produce a concise structured summary with explicit prescription fields.\n"
+        "Return only bullet lines or short key/value lines using these labels when available: Patient, Age / Sex, Diagnosis, Medicines, Instructions, Doctor, Notes.\n"
+        "For Medicines, include the drug name, dose, form, frequency, and duration if mentioned.\n"
+        "For Instructions, include how to take the medicine and any follow-up or self-care directions.\n"
+        "If the transcript mentions a doctor, include 'Doctor: Dr. Name'.\n"
+        "Do not repeat the transcript verbatim. If a field is not present, omit it or leave it blank.\n\n"
+        f"Transcript:\n\n{text}\n"
+    )
+
+
 def summarize_text(text: str, max_sentences: int = 3) -> str:
     api_key = os.environ.get("GEMINI_API_KEY")
     if api_key:
-        prompt = (
-            "You are a clinical summarization assistant.\n"
-            "Read the transcript below and produce ONLY a short bullet-point summary.\n"
-            "Do not repeat the transcript verbatim, and do not include the full text.\n"
-            "Return only concise bullet points.\n"
-            "If the transcript includes a prescribing doctor, include it as a bullet like `Doctor: Dr. Name`.\n\n"
-            f"Transcript:\n\n{text}\n"
-        )
+        gemini_prompt = build_gemini_prescription_prompt(text)
         gemini_summary = call_gemini_summary(
-            prompt,
+            gemini_prompt,
             api_key,
             os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite"),
         )
@@ -206,10 +252,9 @@ def parse_summary_for_fields(summary: str) -> dict:
     # Normalize line endings and iterate lines
     lines = [normalize_summary_line(l) for l in summary.splitlines() if l.strip()]
 
-    # If the summary is just a paragraph, also try to split into pseudo-lines by semicolon
+    # If the summary is just a paragraph, also try to split into pseudo-lines by semicolon or comma.
     if len(lines) == 1 and (";" in lines[0] or "," in lines[0][:200]):
-        # keep it simple; don't aggressively split here
-        pass
+        lines = [normalize_summary_line(l) for l in re.split(r'[;,]\s*', lines[0]) if l.strip()]
 
     # 1) key: value detection
     for line in lines:
@@ -271,15 +316,14 @@ def parse_summary_for_fields(summary: str) -> dict:
         if m:
             fields["medicines"] = m.group(1).strip()
         else:
-            # try to find lines that look like a list of medicines (comma separated or lines starting with -)
-            meds = []
-            for line in lines:
-                if re.match(r"^[\-•]\s*\w+", line):
-                    meds.append(line.lstrip("-• "))
-                elif any(k in line.lower() for k in ("tabs", "mg", "tablet", "cap", "syrup")):
-                    meds.append(line)
+            meds = extract_medicine_lines(lines)
             if meds:
-                fields["medicines"] = "\n".join(meds)
+                fields["medicines"] = "\n".join(dict.fromkeys(meds))
+
+    if not fields["instructions"]:
+        instruction_lines = extract_instruction_lines(lines)
+        if instruction_lines:
+            fields["instructions"] = "\n".join(dict.fromkeys(instruction_lines))
 
     # 3) If nothing identified, put summary into notes
     if not any((fields["diagnosis"], fields["medicines"], fields["instructions"])):
@@ -295,7 +339,7 @@ def parse_summary_for_fields(summary: str) -> dict:
 
     # If patient_name still unknown, try to find "patient <name>" pattern
     if fields["patient_name"] == "Unknown":
-        m = re.search(r"patient\s+([A-Z][a-z]+\s+[A-Z][a-z]+)", summary)
+        m = re.search(r"patient\s+([A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)", summary, re.IGNORECASE)
         if m:
             fields["patient_name"] = m.group(1)
 
