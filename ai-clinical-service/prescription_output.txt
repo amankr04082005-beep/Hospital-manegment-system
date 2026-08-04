@@ -1,17 +1,17 @@
 Doctor Prescription
 
-Date: 2026-08-02
+Date: 2026-08-04
 Patient Name: John Doe
-Age / Sex: 45
-Diagnosis: Diagnosis: Acute bronchitis likely viral; secondary bacterial infection possible.
+Age / Sex: 45 / Male
+Diagnosis: Acute bronchitis likely viral; secondary bacterial infection possible
 
 Medicines:
-
+Paracetamol 650mg: 1 tablet orally every 6-8 hours as needed for fever. Cough syrup 10ml twice daily as needed.
 
 Instructions:
-
+Take medicines after food. Drink warm fluids, rest, and use steam inhalation. Follow up if symptoms worsen or persist beyond 5 days.
 
 Additional Notes:
-Male Cough and fever for 3 days. Patient reports productive cough with yellow sputum. Diagnosis: Acute bronchitis likely viral; secondary bacterial infection possible.
+Cough and fever for 3 days. Patient reports productive cough with yellow sputum. Diagnosis: Acute bronchitis likely viral; secondary bacterial infection possible.
 
 Prescribing Doctor: Dr. Anjali Rao
